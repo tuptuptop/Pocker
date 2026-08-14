@@ -1,0 +1,31 @@
+# Rust
+/target/
+**/*.rs.bk
+Cargo.lock
+
+# Node.js / TypeScript (for Studio frontend)
+node_modules/
+dist/
+.vite/
+*.tsbuildinfo
+
+# Pocker runtime
+.pocker/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Vendor (上游参考项目，不纳入主代码库)
+vendor/
+
+# Environment
+.env
+.env.local
+.env.*.local

@@ -1,0 +1,21 @@
+[package]
+name = "pocker-hub"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "Pocker Hub — plugin registry and distribution platform"
+
+[dependencies]
+pocker-core = { workspace = true }
+axum = { workspace = true }
+tower = { workspace = true }
+tower-http = { workspace = true }
+tokio = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+anyhow = { workspace = true }
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true }
+reqwest = { workspace = true }
+uuid = { workspace = true }
+chrono = { workspace = true }

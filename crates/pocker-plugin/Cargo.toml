@@ -1,0 +1,15 @@
+[package]
+name = "pocker-plugin"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "Pocker plugin SDK — traits, default implementations, and plugin registry"
+
+[dependencies]
+pocker-core = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+async-trait = { workspace = true }
+tokio = { workspace = true }
+anyhow = { workspace = true }
+tracing = { workspace = true }

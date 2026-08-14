@@ -1,0 +1,30 @@
+{
+  "name": "pocker",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Pocker — Plugin as a Service. Everything is a Plugin.",
+  "license": "MIT",
+  "type": "module",
+  "scripts": {
+    "dev": "pnpm --filter @pocker/cli dev",
+    "build": "pnpm -r build",
+    "test": "pnpm -r test",
+    "lint": "pnpm -r lint",
+    "clean": "pnpm -r clean"
+  },
+  "keywords": [
+    "pocker",
+    "plugin",
+    "plugin-as-a-service",
+    "paas",
+    "llm",
+    "ai-agent",
+    "deepseek-harness",
+    "docker",
+    "hermes-studio"
+  ],
+  "engines": {
+    "node": ">=22.0.0"
+  },
+  "packageManager": "pnpm@9.15.0"
+}
