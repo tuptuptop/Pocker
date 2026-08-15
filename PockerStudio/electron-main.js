@@ -1,7 +1,9 @@
-const { app, BrowserWindow, Menu, ipcMain } = require('electron')
-const path = require('node:path')
-const { spawn } = require('node:child_process')
-const fs = require('node:fs')
+import { app, BrowserWindow, Menu, ipcMain } from 'electron'
+import path from 'node:path'
+import { spawn } from 'node:child_process'
+import fs from 'node:fs'
+
+const __dirname = import.meta.dirname
 
 let mainWindow = null
 let serverProcess = null

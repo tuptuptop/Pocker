@@ -117,18 +117,6 @@ jobs:
           name: pocker-studio-engine-macos
           path: PockerStudio/engine
 
-      - name: Isolate PockerStudio from root pnpm workspace
-        shell: bash
-        run: |
-          # 根目录的 pnpm-workspace.yaml 会把 PockerStudio 误判为 monorepo 的子包，
-          # 但它并不在 workspace 的 packages 列表里，导致 pnpm install 不会在
-          # PockerStudio 本地安装依赖（表现为 vite: command not found / node_modules missing）。
-          # 临时移走根 workspace 配置，让 PockerStudio 作为独立项目安装依赖。
-          if [ -f pnpm-workspace.yaml ]; then
-            mv pnpm-workspace.yaml /tmp/pnpm-workspace.root.yaml
-            echo "Moved root pnpm-workspace.yaml aside for isolated install"
-          fi
-
       - name: Install dependencies
         working-directory: PockerStudio
         run: pnpm install --no-frozen-lockfile
