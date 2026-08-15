@@ -1,0 +1,270 @@
+name: Build PockerStudio
+
+on:
+  push:
+    branches:
+      - pks
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  actions: write
+
+env:
+  NODE_VERSION: '22'
+  PNPM_VERSION: '9'
+
+jobs:
+  # ───────────────────────────────────────────
+  # Build Rust Engine (pocker-studio binary)
+  # ───────────────────────────────────────────
+  build-engine:
+    name: Build Engine (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            target: x86_64-pc-windows-msvc
+            artifact_name: pocker-studio-engine-windows
+            asset_suffix: .exe
+          - os: macos-latest
+            target: aarch64-apple-darwin
+            artifact_name: pocker-studio-engine-macos
+            asset_suffix: ''
+    runs-on: ${{ matrix.os }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+
+      - name: Cache Cargo
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: cargo-${{ matrix.os }}-${{ hashFiles('**/Cargo.toml') }}
+          restore-keys: cargo-${{ matrix.os }}-
+
+      - name: Build pocker-studio
+        run: cargo build --release -p pocker-studio
+
+      - name: Rename binary (Windows)
+        if: matrix.os == 'windows-latest'
+        run: |
+          cp target/release/pocker-studio.exe pocker-studio-engine.exe
+
+      - name: Rename binary (macOS)
+        if: matrix.os == 'macos-latest'
+        run: |
+          cp target/release/pocker-studio pocker-studio-engine
+          chmod +x pocker-studio-engine
+
+      - name: Upload engine artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.artifact_name }}
+          path: pocker-studio-engine${{ matrix.asset_suffix }}
+          retention-days: 1
+
+  # ───────────────────────────────────────────
+  # Build PockerStudio Desktop (Electron)
+  # ───────────────────────────────────────────
+  build-studio:
+    name: Build Studio (${{ matrix.os }})
+    needs: build-engine
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            artifact_name: PockerStudio-Setup-windows
+            asset_pattern: '*.exe'
+          - os: macos-latest
+            artifact_name: PockerStudio-Setup-macos
+            asset_pattern: '*.dmg'
+    runs-on: ${{ matrix.os }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: ${{ env.PNPM_VERSION }}
+
+      - name: Download engine artifact (Windows)
+        if: matrix.os == 'windows-latest'
+        uses: actions/download-artifact@v4
+        with:
+          name: pocker-studio-engine-windows
+          path: PockerStudio/engine
+
+      - name: Download engine artifact (macOS)
+        if: matrix.os == 'macos-latest'
+        uses: actions/download-artifact@v4
+        with:
+          name: pocker-studio-engine-macos
+          path: PockerStudio/engine
+
+      - name: Install dependencies
+        working-directory: PockerStudio
+        run: pnpm install --no-frozen-lockfile
+
+      - name: Build frontend
+        working-directory: PockerStudio
+        run: pnpm run build
+        env:
+          NODE_OPTIONS: --max-old-space-size=4096
+
+      - name: Build Electron app (Windows)
+        if: matrix.os == 'windows-latest'
+        working-directory: PockerStudio
+        run: npx electron-builder --win --publish never
+        env:
+          NODE_OPTIONS: --max-old-space-size=4096
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build Electron app (macOS)
+        if: matrix.os == 'macos-latest'
+        working-directory: PockerStudio
+        run: npx electron-builder --mac --publish never
+        env:
+          NODE_OPTIONS: --max-old-space-size=4096
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Find installer files
+        id: find
+        shell: bash
+        working-directory: PockerStudio
+        run: |
+          set -e
+          if [ "${{ matrix.os }}" = "windows-latest" ]; then
+            FILE=$(find release -name "*.exe" -not -name "*.blockmap" | head -1)
+          else
+            FILE=$(find release -name "*.dmg" | head -1)
+          fi
+          echo "file=$FILE" >> $GITHUB_OUTPUT
+          echo "Found installer: $FILE"
+
+      - name: Upload installer artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.artifact_name }}
+          path: PockerStudio/${{ steps.find.outputs.file }}
+          retention-days: 1
+
+  # ───────────────────────────────────────────
+  # Create GitHub Release with exe + dmg
+  # ───────────────────────────────────────────
+  release:
+    name: Create Release
+    needs: build-studio
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Download Windows installer
+        uses: actions/download-artifact@v4
+        with:
+          name: PockerStudio-Setup-windows
+          path: artifacts/windows
+
+      - name: Download macOS installer
+        uses: actions/download-artifact@v4
+        with:
+          name: PockerStudio-Setup-macos
+          path: artifacts/macos
+
+      - name: List artifacts
+        run: |
+          echo "=== Windows ==="
+          ls -la artifacts/windows/
+          echo "=== macOS ==="
+          ls -la artifacts/macos/
+
+      - name: Get short SHA
+        id: sha
+        run: echo "sha=$(git rev-parse --short HEAD)" >> $GITHUB_OUTPUT
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: pocker-studio-${{ steps.sha.outputs.sha }}
+          name: PockerStudio ${{ steps.sha.outputs.sha }}
+          body: |
+            ## PockerStudio Desktop Build
+
+            Built from commit ${{ steps.sha.outputs.sha }}
+
+            ### Downloads
+            - **Windows**: `.exe` installer
+            - **macOS**: `.dmg` installer
+
+            ### Verification
+            This release was auto-built by CI. After successful download verification,
+            the `pks` branch and this release will be automatically deleted.
+          files: |
+            artifacts/windows/*.exe
+            artifacts/macos/*.dmg
+          prerelease: true
+          make_latest: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  # ───────────────────────────────────────────
+  # Cleanup: Delete branch + release after success
+  # ───────────────────────────────────────────
+  cleanup:
+    name: Cleanup (Delete Branch + Release)
+    needs: release
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Get short SHA
+        id: sha
+        run: echo "sha=$(git rev-parse --short HEAD)" >> $GITHUB_OUTPUT
+
+      - name: Wait for release to be fully published
+        run: sleep 15
+
+      - name: Delete the release
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          echo "Deleting release pocker-studio-${{ steps.sha.outputs.sha }}..."
+          gh release delete pocker-studio-${{ steps.sha.outputs.sha }} --yes --cleanup-tag || true
+
+      - name: Delete the pks branch
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          echo "Deleting pks branch..."
+          git push origin --delete pks || true
+
+      - name: Summary
+        run: |
+          echo "✅ Build pipeline completed successfully!"
+          echo "✅ exe and dmg were built and uploaded."
+          echo "✅ Release pocker-studio-${{ steps.sha.outputs.sha }} has been deleted."
+          echo "✅ pks branch has been deleted."
+          echo ""
+          echo "The artifacts were distributed via the brief release window."

@@ -6,6 +6,7 @@ Cargo.lock
 # Node.js / TypeScript (for Studio frontend)
 node_modules/
 dist/
+release/
 .vite/
 *.tsbuildinfo
 
@@ -29,3 +30,7 @@ vendor/
 .env
 .env.local
 .env.*.local
+
+# PockerStudio old hermes lock files (will regenerate)
+PockerStudio/pnpm-lock.yaml
+PockerStudio/package-lock.json
