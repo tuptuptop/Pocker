@@ -6,7 +6,19 @@ import fs from 'node:fs'
 const __dirname = import.meta.dirname
 
 let mainWindow = null
-let serverProcess = null
+let httpServerHandle = null
+
+// Prevent multiple instances (avoids duplicate windows / stray processes).
+if (!app.requestSingleInstanceLock()) {
+  app.quit()
+} else {
+  app.on('second-instance', () => {
+    if (mainWindow) {
+      if (mainWindow.isMinimized()) mainWindow.restore()
+      mainWindow.focus()
+    }
+  })
+}
 
 /**
  * Find the Pocker engine binary.
@@ -39,25 +51,6 @@ function findEngineBinary() {
     }
   }
   return null
-}
-
-function startEmbeddedServer() {
-  // Start the Node.js SSR server (server-entry.js)
-  const serverPath = path.join(__dirname, 'server-entry.js')
-  const port = process.env.PORT || '3000'
-
-  serverProcess = spawn(process.execPath, [serverPath], {
-    env: { ...process.env, PORT: port },
-    stdio: 'pipe',
-  })
-
-  serverProcess.stdout.on('data', (data) => {
-    console.log(`[server] ${data.toString().trim()}`)
-  })
-
-  serverProcess.stderr.on('data', (data) => {
-    console.error(`[server] ${data.toString().trim()}`)
-  })
 }
 
 function startEngine() {
@@ -118,23 +111,32 @@ function createWindow() {
   mainWindow.on('closed', () => {
     mainWindow = null
   })
+
+  mainWindow.webContents.on('did-fail-load', (_event, errorCode, errorDescription) => {
+    console.error(`[renderer] failed to load: ${errorCode} ${errorDescription}`)
+  })
 }
 
 // IPC handlers
 ipcMain.handle('get-version', () => app.getVersion())
 
-app.whenReady().then(() => {
+app.whenReady().then(async () => {
   const isDev = process.argv.includes('--dev')
 
   if (!isDev) {
-    startEmbeddedServer()
+    // Run the SSR server in-process (do NOT spawn a second Electron binary,
+    // which previously caused duplicate windows and an unreliable server).
+    process.env.PORT = process.env.PORT || '3000'
+    try {
+      const { startServer } = await import('./server-entry.js')
+      httpServerHandle = await startServer({ port: parseInt(process.env.PORT, 10) })
+    } catch (err) {
+      console.error('[pocker-server] Failed to start embedded SSR server:', err)
+    }
     startEngine()
-    setTimeout(() => {
-      createWindow()
-    }, 3000)
-  } else {
-    createWindow()
   }
+
+  createWindow()
 
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) {
@@ -144,9 +146,9 @@ app.whenReady().then(() => {
 })
 
 app.on('window-all-closed', () => {
-  if (serverProcess) {
-    serverProcess.kill()
-    serverProcess = null
+  if (httpServerHandle) {
+    httpServerHandle.close()
+    httpServerHandle = null
   }
 
   if (process.platform !== 'darwin') {
@@ -155,8 +157,8 @@ app.on('window-all-closed', () => {
 })
 
 app.on('before-quit', () => {
-  if (serverProcess) {
-    serverProcess.kill()
-    serverProcess = null
+  if (httpServerHandle) {
+    httpServerHandle.close()
+    httpServerHandle = null
   }
 })

@@ -1,7 +1,7 @@
 import { createServer } from 'node:http'
 import { readFile, stat } from 'node:fs/promises'
 import { join, extname } from 'node:path'
-import { fileURLToPath } from 'node:url'
+import { fileURLToPath, pathToFileURL } from 'node:url'
 
 // Load .env before anything else
 try {
@@ -23,9 +23,6 @@ import server from './dist/server/server.js'
 
 const __dirname = fileURLToPath(new URL('.', import.meta.url))
 const CLIENT_DIR = join(__dirname, 'dist', 'client')
-
-const port = parseInt(process.env.PORT || '3000', 10)
-const host = process.env.HOST || '0.0.0.0'
 
 const MIME_TYPES = {
   '.js': 'application/javascript',
@@ -158,6 +155,36 @@ const httpServer = createServer(async (req, res) => {
   }
 })
 
-httpServer.listen(port, host, () => {
-  console.log(`Pocker Studio running at http://${host}:${port}`)
-})
+/**
+ * Start the SSR + static file server.
+ * Used both by `node server-entry.js` (direct run) and by the Electron
+ * main process (in-process, so we don't spawn a second Electron binary).
+ * @param {object} [opts]
+ * @param {number} [opts.port]
+ * @param {string} [opts.host]
+ * @returns {Promise<import('node:http').Server>}
+ */
+export function startServer(opts = {}) {
+  const port = opts.port ?? parseInt(process.env.PORT || '3000', 10)
+  const host = opts.host ?? (process.env.HOST || '0.0.0.0')
+
+  return new Promise((resolve, reject) => {
+    const onError = (err) => reject(err)
+    httpServer.once('error', onError)
+    httpServer.listen(port, host, () => {
+      httpServer.removeListener('error', onError)
+      console.log(`Pocker Studio running at http://${host}:${port}`)
+      resolve(httpServer)
+    })
+  })
+}
+
+// Run directly via `node server-entry.js` (npm start / local dev server).
+// When imported by the Electron main process this guard is false, so the
+// server is only started explicitly via startServer().
+if (import.meta.url === pathToFileURL(process.argv[1] || '').href) {
+  startServer().catch((err) => {
+    console.error('Failed to start Pocker Studio server:', err)
+    process.exit(1)
+  })
+}
