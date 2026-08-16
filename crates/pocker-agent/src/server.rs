@@ -136,7 +136,7 @@ fn search_sessions(
     axum::extract::Query(params): axum::extract::Query<HashMap<String, String>>,
 ) -> impl axum::response::IntoResponse {
     let q = params.get("q").cloned().unwrap_or_default();
-    Json(json!({ "query": q, "count": 0, "results": [] as Vec<Value> }))
+    Json(json!({ "query": q, "count": 0, "results": [] }))
 }
 
 async fn chat_nonstream(
@@ -172,7 +172,7 @@ fn messages(
     _state: State<Arc<AppState>>,
     Path(_id): Path<String>,
 ) -> impl axum::response::IntoResponse {
-    Json(json!({ "items": [] as Vec<Value>, "total": 0 }))
+    Json(json!({ "items": [], "total": 0 }))
 }
 
 fn fork_session(
@@ -209,15 +209,15 @@ fn fork_session(
 }
 
 fn memory() -> impl axum::response::IntoResponse {
-    Json(json!({ "object": "memory", "data": [] as Vec<Value> }))
+    Json(json!({ "object": "memory", "data": [] }))
 }
 
 fn skills() -> impl axum::response::IntoResponse {
-    Json(json!([] as Vec<Value>))
+    Json(json!([]))
 }
 
 fn skills_categories() -> impl axum::response::IntoResponse {
-    Json(json!([] as Vec<Value>))
+    Json(json!([]))
 }
 
 fn config_route(State(state): State<Arc<AppState>>) -> impl axum::response::IntoResponse {
