@@ -349,8 +349,8 @@ fn order_by_dependencies(instances: &[(PluginId, Arc<dyn Plugin>)]) -> Vec<Plugi
     while !remaining.is_empty() {
         let mut ready: Vec<String> = remaining
             .iter()
+            .filter(|&n| indegree.get(n).copied().unwrap_or(0) == 0)
             .cloned()
-            .filter(|n| indegree.get(n).copied().unwrap_or(0) == 0)
             .collect();
         if ready.is_empty() {
             // Cycle: break it by taking the smallest-index remaining node.

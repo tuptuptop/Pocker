@@ -182,16 +182,18 @@ mod tests {
     #[tokio::test]
     async fn test_plugin_info_found() {
         // Register the built-in core plugin into the loader so the API has
-        // real metadata to surface.
+        // real metadata to surface. The registration key is ASCII because the
+        // hub route extracts `:name` from the path and rejects `@` there; the
+        // plugin's own metadata name (`@pocker/core`) is still asserted below.
         let engine = Arc::new(Engine::new());
         engine
-            .register_plugin("@pocker/core", Arc::new(pocker_engine::CoreBundlePlugin::new()))
+            .register_plugin("core", Arc::new(pocker_engine::CoreBundlePlugin::new()))
             .unwrap();
         let app = build_router(engine);
         let response = app
             .oneshot(
                 Request::builder()
-                    .uri("/v1/plugins/@pocker/core")
+                    .uri("/v1/plugins/core")
                     .body(Body::empty())
                     .unwrap(),
             )
