@@ -181,13 +181,13 @@ mod tests {
         // real metadata to surface.
         let engine = Arc::new(Engine::new());
         engine
-            .register_plugin("@pocker/core", Arc::new(pocker_engine::CoreBundlePlugin::new()))
+            .register_plugin("core", Arc::new(pocker_engine::CoreBundlePlugin::new()))
             .unwrap();
         let app = build_router(engine);
         let response = app
             .oneshot(
                 Request::builder()
-                    .uri("/api/plugins/@pocker/core")
+                    .uri("/api/plugins/core")
                     .body(Body::empty())
                     .unwrap(),
             )
