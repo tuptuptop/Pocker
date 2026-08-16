@@ -1,0 +1,47 @@
+[package]
+name = "pocker-agent"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "Pocker Rust-native agent backend (replaces the Python Hermes agent sidecar)"
+
+[[bin]]
+name = "pocker-agent"
+path = "src/main.rs"
+
+[lib]
+name = "pocker_agent"
+path = "src/lib.rs"
+
+[dependencies]
+# Async runtime
+tokio = { workspace = true }
+tokio-stream = { workspace = true }
+futures = { workspace = true }
+async-trait = { workspace = true }
+
+# Serialization
+serde = { workspace = true }
+serde_json = { workspace = true }
+
+# Error handling
+anyhow = { workspace = true }
+thiserror = { workspace = true }
+
+# Logging
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true }
+
+# HTTP / API
+axum = { workspace = true }
+tower = { workspace = true }
+tower-http = { workspace = true }
+reqwest = { workspace = true }
+
+# Misc
+uuid = { workspace = true }
+chrono = { workspace = true }
+
+# Internal crates
+pocker-core = { workspace = true }
+pocker-engine = { workspace = true }

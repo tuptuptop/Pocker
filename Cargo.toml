@@ -10,6 +10,7 @@ members = [
     "crates/pocker-hub",
     "crates/pocker-studio",
     "crates/pocker-sdk",
+    "crates/pocker-agent",
 ]
 
 [workspace.package]
@@ -109,6 +110,7 @@ pocker-sandbox = { path = "crates/pocker-sandbox" }
 pocker-sdk = { path = "crates/pocker-sdk" }
 pocker-studio = { path = "crates/pocker-studio" }
 pocker-hub = { path = "crates/pocker-hub" }
+pocker-agent = { path = "crates/pocker-agent" }
 
 # Reference / integration dependencies — upstream deepseek-harness family.
 # These crates are not yet published to crates.io. Once a source is available,

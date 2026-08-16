@@ -20,33 +20,21 @@ function detectPlatform(): Platform {
 function getSetupSteps(
   platform: Platform,
 ): Array<{ title: string; command: string; note?: string }> {
-  const pip = platform === 'windows' ? 'pip' : 'pip3'
-  const python = platform === 'windows' ? 'python' : 'python3'
-
   return [
     {
       title: 'Use any OpenAI-compatible backend',
       command: 'Set HERMES_API_URL to your backend base URL',
-      note: 'Portable chat works with any backend that exposes /v1/chat/completions (Ollama, LiteLLM, vLLM, etc.)',
+      note: 'The workspace talks to the Rust pocker-agent (port 8642), which proxies any provider that exposes /v1/chat/completions (Ollama, LiteLLM, vLLM, OpenAI, OpenRouter, etc.)',
     },
     {
-      title: 'Optional: run a Hermes gateway locally',
-      command: 'git clone https://github.com/outsourc-e/hermes-agent.git',
-      note: 'Hermes gateway APIs unlock sessions, skills, memory, and other workspace extras automatically',
+      title: 'Optional: run the Pocker agent locally',
+      command: 'pocker agent serve --port 8642',
+      note: 'Or run the standalone `pocker-agent` binary. It auto-starts on port 8642 and proxies your configured LLM provider.',
     },
     {
-      title: 'Install the gateway',
-      command: `cd hermes-agent && ${python} -m venv .venv && ${platform === 'windows' ? '.venv\\Scripts\\activate' : 'source .venv/bin/activate'} && ${pip} install -e .`,
-    },
-    {
-      title: 'Enable the HTTP API server',
-      command: 'echo "API_SERVER_ENABLED=true" >> ~/.hermes/.env',
-      note: 'The gateway HTTP API is opt-in. Without this, the gateway serves messaging platforms but does not expose port 8642 for the workspace.',
-    },
-    {
-      title: 'Start the gateway',
-      command: `cd hermes-agent && ${platform === 'windows' ? '.venv\\Scripts\\activate' : 'source .venv/bin/activate'} && hermes --gateway`,
-      note: 'Or use Auto-Start below if hermes-agent is already installed locally',
+      title: 'Point the workspace at the agent',
+      command: 'Set HERMES_API_URL=http://127.0.0.1:8642',
+      note: 'If the agent is already running on 8642 the workspace connects automatically — no Python interpreter or gateway install required.',
     },
   ]
 }

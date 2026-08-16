@@ -10,7 +10,7 @@ RUN pnpm install --no-frozen-lockfile
 
 COPY . .
 
-ENV HERMES_API_URL=http://hermes-agent:8642
+ENV HERMES_API_URL=http://pocker-agent:8642
 
 EXPOSE 3000
 

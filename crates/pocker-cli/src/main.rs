@@ -73,6 +73,11 @@ enum Commands {
         #[command(subcommand)]
         action: SystemCommands,
     },
+    /// Start the Rust-native agent backend (replaces the Python Hermes sidecar)
+    Agent {
+        #[command(subcommand)]
+        action: AgentCommands,
+    },
 }
 
 #[derive(Subcommand)]
@@ -109,6 +114,16 @@ enum HubCommands {
 enum SystemCommands {
     /// Show system info
     Info,
+}
+
+#[derive(Subcommand)]
+enum AgentCommands {
+    /// Serve the agent HTTP API (Hermes-compatible contract on port 8642)
+    Serve {
+        /// Port to listen on
+        #[arg(long, default_value = "8642")]
+        port: u16,
+    },
 }
 
 #[tokio::main]
@@ -202,6 +217,14 @@ async fn main() -> anyhow::Result<()> {
         Some(Commands::System { action }) => {
             commands::handle_system(&action, &engine)?;
         }
+        Some(Commands::Agent { action }) => match action {
+            AgentCommands::Serve { port } => {
+                let mut cfg = pocker_agent::Config::from_env();
+                cfg.port = port;
+                println!("Starting Pocker agent backend on port {port} (provider={})", cfg.provider.as_str());
+                pocker_agent::serve(cfg).await?;
+            }
+        },
         None => {
             // No command — show help
             Cli::command().print_help()?;

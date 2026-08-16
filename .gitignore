@@ -25,11 +25,6 @@ Thumbs.db
 
 # Vendor — 上游参考项目（hermes-studio / deepseek-harness）不纳入主代码库
 vendor/*
-# 例外：Hermes Python sidecar 是 Pocker 主动集成的代码，需纳入版本控制
-!vendor/hermes-agent-py/
-vendor/hermes-agent-py/.venv/
-vendor/hermes-agent-py/install.log
-vendor/hermes-agent-py/*.env
 
 # Environment
 .env

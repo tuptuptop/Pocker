@@ -64,8 +64,6 @@ const IGNORED_DIRS = new Set([
   '.next',
   '.turbo',
   '.cache',
-  '__pycache__',
-  '.venv',
   'dist',
 ])
 

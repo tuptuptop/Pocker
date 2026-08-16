@@ -1,43 +1,32 @@
-# Hermes Studio + Agent — Docker Compose Setup
+# Pocker Studio + Agent — Docker Compose Setup
 #
 # Requirements:
 #   - Docker & Docker Compose
-#   - ANTHROPIC_API_KEY in .env file (required for the agent gateway)
+#   - A provider API key in .env (OpenAI, OpenRouter, or Anthropic)
 #
-# Quick Start (no Redis — sessions stored in container file system):
+# Quick Start:
 #   1. cp .env.example .env
-#   2. Add your ANTHROPIC_API_KEY to .env
+#   2. Add your provider key to .env (e.g. OPENAI_API_KEY / ANTHROPIC_API_KEY)
 #   3. docker compose up
 #   4. Open http://localhost:3000
 #
-# With Redis session persistence (sessions survive container restarts):
-#   1. Add REDIS_URL=redis://redis:6379 to your .env
-#   2. docker compose --profile redis up
-#
-# Troubleshooting:
-#   - Check logs: docker compose logs hermes-studio
-#   - Check logs: docker compose logs hermes-agent
-#
-# Version Pinning:
-#   By default, builds the latest Hermes Agent from the main branch.
-#   To pin to a specific version (e.g., v0.18.0):
-#     HERMES_AGENT_VERSION=0.18.0 docker compose up
-#   Or set HERMES_AGENT_VERSION in .env:
-#     HERMES_AGENT_VERSION=0.18.0
+# The agent backend is the Rust-native `pocker-agent` binary (no Python).
+# It proxies any OpenAI-compatible provider and speaks the Hermes HTTP
+# contract that PockerStudio expects.
 
 services:
-  # The Hermes AI Agent Gateway
-  # Provides the backend API that the workspace connects to
-  hermes-agent:
+  # The Pocker Rust-native agent backend
+  # Provides the backend API that the studio connects to (port 8642).
+  pocker-agent:
     build:
-      context: .
-      dockerfile: docker/agent/Dockerfile
-      args:
-        HERMES_AGENT_VERSION: ${HERMES_AGENT_VERSION:-main}
+      context: ..
+      dockerfile: PockerStudio/docker/agent/Dockerfile
     env_file:
       - .env
     environment:
-      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      # Defaults to the OpenAI-compatible provider; override via .env.
+      POCKER_AGENT_PROVIDER: ${POCKER_AGENT_PROVIDER:-openai}
+      POCKER_AGENT_PORT: "8642"
     healthcheck:
       test: ['CMD', 'curl', '-f', 'http://localhost:8642/health']
       interval: 10s
@@ -47,25 +36,25 @@ services:
     ports:
       - '8642:8642'
 
-  # The Hermes Studio Web UI
-  # Connects to hermes-agent at http://hermes-agent:8642
+  # The Pocker Studio Web UI
+  # Connects to pocker-agent at http://pocker-agent:8642
   #
   # Redis: if REDIS_URL=redis://redis:6379 is set in .env and the redis
   # profile is active, the studio will automatically use Redis for session
   # persistence. If Redis is unavailable on startup, it retries for ~30s
   # then falls back to the file-based store gracefully.
-  hermes-studio:
+  pocker-studio:
     build:
       context: .
       dockerfile: docker/workspace/Dockerfile
     depends_on:
-      hermes-agent:
+      pocker-agent:
         condition: service_healthy
     env_file:
       - .env
     environment:
       # Internal Docker network URL (not localhost!)
-      HERMES_API_URL: http://hermes-agent:8642
+      HERMES_API_URL: http://pocker-agent:8642
       # Inherited from .env — empty string means "no Redis, use file store".
       # Set REDIS_URL=redis://redis:6379 in .env when running --profile redis.
       REDIS_URL: ${REDIS_URL:-}

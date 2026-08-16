@@ -1,6 +1,6 @@
 import { spawn } from 'node:child_process'
-import { existsSync, readFileSync } from 'node:fs'
-import { dirname, join, resolve } from 'node:path'
+import { existsSync } from 'node:fs'
+import { dirname, resolve } from 'node:path'
 import { homedir } from 'node:os'
 
 const HERMES_HEALTH_TIMEOUT_MS = 2_000
@@ -20,64 +20,29 @@ export type StartHermesAgentResult =
     }
 
 /**
- * Read ~/.hermes/.env and return key=value pairs as an object.
- * Silently returns {} if the file doesn't exist or can't be parsed.
+ * Resolve the Pocker agent backend binary.
+ *
+ * The agent backend is now the Rust-native `pocker-agent` (or `pocker agent
+ * serve` subcommand) — the Python Hermes sidecar has been removed. The binary
+ * is located via `POCKER_AGENT_BIN`, then a sibling `pocker-agent` dir, then
+ * the system `pocker` CLI on PATH.
  */
-function readHermesEnv(): Record<string, string> {
-  const envPath = join(homedir(), '.hermes', '.env')
-  try {
-    const raw = readFileSync(envPath, 'utf-8')
-    const result: Record<string, string> = {}
-    for (const line of raw.split('\n')) {
-      const trimmed = line.trim()
-      if (!trimmed || trimmed.startsWith('#')) continue
-      const eqIdx = trimmed.indexOf('=')
-      if (eqIdx <= 0) continue
-      const key = trimmed.slice(0, eqIdx).trim()
-      let value = trimmed.slice(eqIdx + 1).trim()
-      if (
-        (value.startsWith('"') && value.endsWith('"')) ||
-        (value.startsWith("'") && value.endsWith("'"))
-      ) {
-        value = value.slice(1, -1)
-      }
-      if (key) result[key] = value
-    }
-    return result
-  } catch {
-    return {}
-  }
-}
-
-/** Same directory resolution logic as vite.config.ts. */
-export function resolveHermesAgentDir(
-  env: Record<string, string | undefined> = process.env,
-): string | null {
-  const candidates: Array<string> = []
-
-  if (env.HERMES_AGENT_PATH?.trim()) {
-    candidates.push(env.HERMES_AGENT_PATH.trim())
+export function resolveHermesAgentBin(): string | null {
+  if (process.env.POCKER_AGENT_BIN?.trim()) {
+    return process.env.POCKER_AGENT_BIN.trim()
   }
 
   const workspaceRoot = dirname(resolve('.'))
-  candidates.push(
-    resolve(workspaceRoot, 'hermes-agent'),
-    resolve(workspaceRoot, '..', 'hermes-agent'),
-  )
-
-  for (const candidate of candidates) {
-    if (existsSync(resolve(candidate, 'webapi'))) return candidate
+  const candidates = [
+    resolve(workspaceRoot, 'pocker-agent', 'target', 'release', 'pocker-agent'),
+    resolve(workspaceRoot, 'pocker-agent', 'target', 'debug', 'pocker-agent'),
+    resolve(workspaceRoot, '..', 'pocker-agent', 'target', 'release', 'pocker-agent'),
+    'pocker',
+  ]
+  for (const c of candidates) {
+    if (existsSync(c)) return c
   }
-
-  return null
-}
-
-export function resolveHermesPython(agentDir: string): string {
-  const venvPython = resolve(agentDir, '.venv', 'bin', 'python')
-  if (existsSync(venvPython)) return venvPython
-  const uvVenv = resolve(agentDir, 'venv', 'bin', 'python')
-  if (existsSync(uvVenv)) return uvVenv
-  return 'python3'
+  return 'pocker'
 }
 
 export async function isHermesAgentHealthy(
@@ -93,6 +58,10 @@ export async function isHermesAgentHealthy(
   }
 }
 
+async function sleep(ms: number): Promise<void> {
+  return new Promise((r) => setTimeout(r, ms))
+}
+
 export async function startHermesAgent(): Promise<StartHermesAgentResult> {
   if (await isHermesAgentHealthy()) {
     return { ok: true, message: 'already running' }
@@ -104,45 +73,21 @@ export async function startHermesAgent(): Promise<StartHermesAgentResult> {
 
   startPromise = (async () => {
     try {
-      const agentDir = resolveHermesAgentDir()
-      if (!agentDir) {
-        return {
-          ok: false,
-          error:
-            'hermes-agent not found. Clone it as a sibling directory or set HERMES_AGENT_PATH in .env',
-        }
-      }
-
-      const python = resolveHermesPython(agentDir)
-      const hermesEnv = readHermesEnv()
-
+      const bin = resolveHermesAgentBin()
       const child = spawn(
-        python,
-        [
-          '-m',
-          'uvicorn',
-          'webapi.app:app',
-          '--host',
-          '0.0.0.0',
-          '--port',
-          String(HERMES_START_PORT),
-        ],
+        bin,
+        ['agent', 'serve', '--port', String(HERMES_START_PORT)],
         {
-          cwd: agentDir,
+          cwd: process.cwd(),
           detached: true,
           stdio: 'ignore',
-          env: {
-            ...process.env,
-            ...hermesEnv,
-            PATH: `${resolve(agentDir, '.venv', 'bin')}:${resolve(agentDir, 'venv', 'bin')}:${process.env.PATH || ''}`,
-          },
+          env: process.env,
         },
       )
-
       child.unref()
 
-      for (let attempt = 0; attempt < 10; attempt += 1) {
-        await new Promise((resolveAttempt) => setTimeout(resolveAttempt, 1_000))
+      for (let attempt = 0; attempt < 15; attempt += 1) {
+        await sleep(1_000)
         if (await isHermesAgentHealthy()) {
           return {
             ok: true,

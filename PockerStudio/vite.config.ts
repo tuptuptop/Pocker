@@ -1,5 +1,5 @@
 import { URL, fileURLToPath } from 'node:url'
-import { existsSync, mkdirSync, copyFileSync } from 'node:fs'
+import { existsSync } from 'node:fs'
 import { resolve } from 'node:path'
 
 import { tanstackStart } from '@tanstack/react-start/plugin/vite'
@@ -172,19 +172,6 @@ const config = defineConfig(({ mode }) => {
           result = result.replace(/process\.env/g, '{}')
           result = result.replace(/process\.platform/g, '"browser"')
           return result
-        },
-      },
-      // Copy pty-helper.py into the server assets directory after build
-      {
-        name: 'copy-pty-helper',
-        closeBundle() {
-          const src = resolve('src/server/pty-helper.py')
-          const destDir = resolve('dist/server/assets')
-          const dest = resolve(destDir, 'pty-helper.py')
-          if (existsSync(src)) {
-            mkdirSync(destDir, { recursive: true })
-            copyFileSync(src, dest)
-          }
         },
       },
     ],

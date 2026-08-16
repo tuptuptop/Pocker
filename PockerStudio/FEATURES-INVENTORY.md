@@ -77,7 +77,7 @@
 
 ### 1.4 Terminal Screen (`/terminal`)
 
-- **Full PTY terminal** via Python pty-helper
+- **Full PTY terminal** via node-pty (no Python dependency)
 - **xterm.js** with addons: fit, search, web-links
 - **256-color support** (TERM=xterm-256color, COLORTERM=truecolor)
 - **Persistent shell sessions** — create, input, resize, close
@@ -424,7 +424,7 @@
 
 ### 5.4 Terminal Sessions
 
-- Python PTY helper (`pty-helper.py`) — real PTY without native node-pty addon
+- node-pty PTY helper — real PTY with no Python dependency
 - Session management: create, input, resize (SIGWINCH), close (SIGTERM → SIGKILL)
 - Event emitter pattern with early buffer for pre-listener output
 
@@ -445,10 +445,10 @@
 
 ### 5.7 Hermes Agent Auto-Start
 
-- Auto-detects sibling `hermes-agent/` directory
-- Resolves Python virtualenv (`.venv`, `venv`, system `python3`)
-- Spawns uvicorn with health polling (15 attempts, 1s interval)
-- Reads `~/.hermes/.env` for agent configuration
+- Auto-detects the Rust `pocker-agent` binary (or the `pocker` CLI)
+- Resolves the binary via `POCKER_AGENT_BIN`, then a sibling `pocker-agent/` build dir, then `pocker` on PATH
+- Spawns `pocker agent serve --port 8642` with `/health` polling (15 attempts, 1s interval)
+- Reads `POCKER_AGENT_*` env vars for provider / API key / model configuration
 
 ### 5.8 Workspace Daemon (Optional)
 
@@ -680,7 +680,7 @@ pnpm stop:stable   # Stop via scripts/stop-stable.sh
 
 ### 10.4 Docker Compose
 
-- **hermes-agent** container — Python FastAPI gateway on port 8642
+- **pocker-agent** container — Rust-native agent backend on port 8642
 - **hermes-workspace** container — Node.js web UI on port 3000
 - Health checks with retries
 - Environment file passthrough
@@ -718,7 +718,7 @@ pnpm stop:stable   # Stop via scripts/stop-stable.sh
 | Styling       | Tailwind CSS 4                  |
 | State         | Zustand 5 (persisted)           |
 | Data Fetching | TanStack React Query 5          |
-| Terminal      | xterm.js 5 + Python PTY         |
+| Terminal      | xterm.js 5 + node-pty           |
 | Editor        | Monaco Editor                   |
 | Markdown      | react-markdown + Shiki          |
 | Charts        | Recharts 3                      |

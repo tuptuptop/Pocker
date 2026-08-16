@@ -1,14 +1,15 @@
 /**
- * Terminal sessions using Python PTY helper.
- * Gives us real PTY (echo, colors, resize) without node-pty native addon.
+ * Terminal sessions using node-pty — a real PTY with no Python dependency.
+ *
+ * This replaces the previous `pty-helper.py` Python sidecar. node-pty gives
+ * us a true PTY (echo, colors, resize) entirely in Node, so the terminal
+ * feature no longer requires a system Python interpreter.
  */
 import { randomUUID } from 'node:crypto'
-import { spawn } from 'node:child_process'
-import { dirname, resolve } from 'node:path'
-import { fileURLToPath } from 'node:url'
 import { homedir } from 'node:os'
 import EventEmitter from 'node:events'
-import type { ChildProcess } from 'node:child_process'
+import type { IPty } from 'node-pty'
+import * as pty from 'node-pty'
 
 export type TerminalSessionEvent = {
   event: string
@@ -26,12 +27,16 @@ export type TerminalSession = {
 
 const sessions = new Map<string, TerminalSession>()
 
-// Resolve path to pty-helper.py relative to this file
-const __dirname_resolved =
-  typeof __dirname !== 'undefined'
-    ? __dirname
-    : dirname(fileURLToPath(import.meta.url))
-const PTY_HELPER = resolve(__dirname_resolved, 'pty-helper.py')
+/** Pick a sensible default login shell per platform. */
+function defaultShell(): { shell: string; args: string[] } {
+  if (process.platform === 'win32') {
+    return { shell: 'powershell.exe', args: [] }
+  }
+  if (process.platform === 'darwin') {
+    return { shell: '/bin/zsh', args: ['-i', '-l'] }
+  }
+  return { shell: process.env.SHELL || '/bin/bash', args: ['-i'] }
+}
 
 export function createTerminalSession(params: {
   command?: Array<string>
@@ -44,20 +49,11 @@ export function createTerminalSession(params: {
   const sessionId = randomUUID()
 
   const home = process.env.HOME ?? homedir() ?? '/tmp'
-  const defaultShell =
-    process.platform === 'win32'
-      ? 'powershell.exe'
-      : process.platform === 'darwin'
-        ? '/bin/zsh'
-        : '/bin/bash'
-  const shell = params.command?.[0] ?? process.env.SHELL ?? defaultShell
-  let cwd = params.cwd ?? home
-  if (cwd.startsWith('~')) {
-    cwd = cwd.replace('~', home)
-  }
-
   const cols = params.cols ?? 80
   const rows = params.rows ?? 24
+
+  let cwd = params.cwd ?? home
+  if (cwd.startsWith('~')) cwd = cwd.replace('~', home)
 
   // Buffer early output before any listener registers
   const earlyBuffer: Array<TerminalSessionEvent> = []
@@ -83,39 +79,29 @@ export function createTerminalSession(params: {
     }
   }
 
-  // Spawn Python PTY helper
-  const proc: ChildProcess = spawn(
-    'python3',
-    [PTY_HELPER, shell, cwd, String(cols), String(rows)],
-    {
-      env: {
-        ...process.env,
-        ...params.env,
-        TERM: 'xterm-256color',
-        COLORTERM: 'truecolor',
-        COLUMNS: String(cols),
-        LINES: String(rows),
-      } as Record<string, string>,
-      stdio: ['pipe', 'pipe', 'pipe'],
-    },
-  )
+  const { shell, args } = defaultShell()
+  const requested = params.command
+  const spawnFile = requested?.[0] ?? shell
+  const spawnArgs = requested && requested.length > 1 ? requested.slice(1) : args
 
-  proc.stdout?.on('data', (data: Buffer) => {
-    pushEvent({
-      event: 'data',
-      payload: { data: data.toString() },
-    })
+  const term: IPty = pty.spawn(spawnFile, spawnArgs, {
+    name: 'xterm-256color',
+    cols,
+    rows,
+    cwd,
+    env: {
+      ...process.env,
+      ...params.env,
+      TERM: 'xterm-256color',
+      COLORTERM: 'truecolor',
+    } as Record<string, string>,
   })
 
-  // stderr from the helper itself (not the shell)
-  proc.stderr?.on('data', (data: Buffer) => {
-    const msg = data.toString()
-    if (msg.trim()) {
-      if (import.meta.env.DEV) console.error('[pty-helper stderr]', msg)
-    }
+  term.onData((data: string) => {
+    pushEvent({ event: 'data', payload: { data } })
   })
 
-  proc.on('exit', (exitCode, signal) => {
+  term.onExit(({ exitCode, signal }) => {
     pushEvent({
       event: 'exit',
       payload: { exitCode, signal: signal ?? undefined },
@@ -124,48 +110,32 @@ export function createTerminalSession(params: {
     sessions.delete(sessionId)
   })
 
-  proc.on('error', (err) => {
-    pushEvent({
-      event: 'error',
-      payload: { message: err.message },
-    })
-  })
-
   const session: TerminalSession = {
     id: sessionId,
     createdAt: Date.now(),
     emitter,
 
     sendInput(data: string) {
-      if (proc.stdin?.writable) {
-        proc.stdin.write(data)
+      try {
+        term.write(data)
+      } catch {
+        /* ignore writes after exit */
       }
     },
 
-    resize(_newCols: number, _newRows: number) {
-      // Send SIGWINCH to the Python helper, which propagates to the PTY
-      if (proc.pid) {
-        // Note: can't update env on running ChildProcess, SIGWINCH alone is sent
-        try {
-          process.kill(proc.pid, 'SIGWINCH')
-        } catch {
-          /* */
-        }
+    resize(newCols: number, newRows: number) {
+      try {
+        term.resize(newCols, newRows)
+      } catch {
+        /* ignore resize failures */
       }
     },
 
     close() {
       try {
-        proc.kill('SIGTERM')
-        setTimeout(() => {
-          try {
-            proc.kill('SIGKILL')
-          } catch {
-            /* */
-          }
-        }, 2000)
+        term.kill()
       } catch {
-        /* */
+        /* ignore */
       }
       sessions.delete(sessionId)
     },
