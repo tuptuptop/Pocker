@@ -7,6 +7,7 @@ description = "Pocker Hub — plugin registry and distribution platform"
 
 [dependencies]
 pocker-core = { workspace = true }
+pocker-engine = { workspace = true }
 axum = { workspace = true }
 tower = { workspace = true }
 tower-http = { workspace = true }

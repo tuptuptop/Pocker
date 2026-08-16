@@ -6,10 +6,17 @@
 
 #[cfg(test)]
 mod integration;
+pub mod builtins;
 pub mod loader;
 pub mod profile;
+pub mod registry;
 pub mod runtime;
 
+pub use builtins::CoreBundlePlugin;
 pub use loader::PluginLoader;
 pub use profile::{ProfileError, ProfileManager};
+pub use registry::{
+    BundleRegistry, PluginFactory, PluginLoadOutcome, PluginLoadStatus, PluginRegistry,
+    ProfileLoadResult,
+};
 pub use runtime::Engine;

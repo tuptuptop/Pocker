@@ -2,7 +2,7 @@
 
 use pocker_core::context::Ctx;
 use pocker_core::error::{PockerError, Result};
-use pocker_core::plugin::{Plugin, PluginHandle};
+use pocker_core::plugin::{Plugin, PluginHandle, PluginMetadata};
 use pocker_core::seam::SeamId;
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -172,6 +172,18 @@ impl PluginLoader {
         plugins
             .get(name)
             .is_some_and(pocker_core::plugin::PluginHandle::is_mounted)
+    }
+
+    /// Get a clone of a registered plugin's metadata, or `None` if the plugin
+    /// is not registered. Used by the hub/studio APIs to surface real plugin
+    /// metadata and status.
+    #[must_use]
+    pub fn metadata(&self, name: &str) -> Option<PluginMetadata> {
+        let plugins = self
+            .plugins
+            .read()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        plugins.get(name).map(|h| h.plugin.metadata().clone())
     }
 }
 

@@ -14,6 +14,8 @@ pocker-core = { workspace = true }
 pocker-engine = { workspace = true }
 pocker-plugin = { workspace = true }
 pocker-sandbox = { workspace = true }
+pocker-studio = { workspace = true }
+pocker-hub = { workspace = true }
 clap = { workspace = true }
 tokio = { workspace = true }
 serde = { workspace = true }

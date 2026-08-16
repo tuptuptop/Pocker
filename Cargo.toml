@@ -90,6 +90,8 @@ pocker-plugin = { path = "crates/pocker-plugin" }
 pocker-engine = { path = "crates/pocker-engine" }
 pocker-sandbox = { path = "crates/pocker-sandbox" }
 pocker-sdk = { path = "crates/pocker-sdk" }
+pocker-studio = { path = "crates/pocker-studio" }
+pocker-hub = { path = "crates/pocker-hub" }
 
 [profile.release]
 opt-level = 3

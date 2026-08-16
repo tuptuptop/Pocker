@@ -11,6 +11,8 @@
 mod commands;
 
 use clap::{CommandFactory, Parser, Subcommand};
+use std::net::SocketAddr;
+use std::sync::Arc;
 
 #[derive(Parser)]
 #[command(
@@ -127,13 +129,22 @@ async fn main() -> anyhow::Result<()> {
     // Load profile if specified
     if let Some(profile_name) = &cli.profile {
         if engine.profiles.exists(profile_name) {
-            engine.load_profile(profile_name)?;
-            println!("Loaded profile: {profile_name}");
+            let res = engine.load_profile(profile_name).await?;
+            println!(
+                "Loaded profile: {profile_name} ({} plugins loaded, {} skipped/failed)",
+                res.loaded_count(),
+                res.problem_count()
+            );
         } else {
             eprintln!("Profile not found: {profile_name}");
         }
     } else if engine.profiles.exists("web") {
-        engine.load_profile("web")?;
+        let res = engine.load_profile("web").await?;
+        println!(
+            "Loaded profile: web ({} plugins loaded, {} skipped/failed)",
+            res.loaded_count(),
+            res.problem_count()
+        );
     } else {
         // Create default profile
         let _ = engine.profiles.create(
@@ -141,7 +152,12 @@ async fn main() -> anyhow::Result<()> {
             "Default profile",
             vec!["@pocker/core-bundle".to_string()],
         );
-        engine.load_profile("default")?;
+        let res = engine.load_profile("default").await?;
+        println!(
+            "Loaded profile: default ({} plugins loaded, {} skipped/failed)",
+            res.loaded_count(),
+            res.problem_count()
+        );
     }
 
     // Handle --dump-config
@@ -156,8 +172,10 @@ async fn main() -> anyhow::Result<()> {
         Some(Commands::Web) => {
             println!("Starting Pocker Studio (Web UI)...");
             println!("Visit: http://127.0.0.1:3080");
-            // TODO: Start the web server (pocker-studio)
-            println!("Web UI not yet implemented. Use --dump-config to inspect.");
+            let addr: SocketAddr = "127.0.0.1:3080".parse()?;
+            let static_dir =
+                dirs::home_dir().map(|h| h.join(".pocker").join("studio").join("dist"));
+            pocker_studio::run(addr, static_dir, Arc::new(engine)).await?;
         }
         Some(Commands::Tui) => {
             println!("Starting Pocker TUI...");
@@ -165,15 +183,15 @@ async fn main() -> anyhow::Result<()> {
             println!("TUI not yet implemented.");
         }
         Some(Commands::Headless { port }) => {
-            println!("Starting headless API on port {port}...");
-            // TODO: Start the API server
-            println!("Headless API not yet implemented.");
+            println!("Starting headless API (Pocker Hub) on port {port}...");
+            let addr: SocketAddr = format!("0.0.0.0:{port}").parse()?;
+            pocker_hub::run(addr, Arc::new(engine)).await?;
         }
         Some(Commands::Plugin { action }) => {
             commands::handle_plugin(action, &engine)?;
         }
         Some(Commands::Profile { action }) => {
-            commands::handle_profile(action, &engine)?;
+            commands::handle_profile(action, &engine).await?;
         }
         Some(Commands::Run { name, input }) => {
             commands::handle_run(&name, input, &engine)?;

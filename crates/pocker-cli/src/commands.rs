@@ -60,7 +60,7 @@ pub fn handle_plugin(action: crate::PluginCommands, engine: &Engine) -> Result<(
 }
 
 #[allow(clippy::unnecessary_wraps)]
-pub fn handle_profile(action: crate::ProfileCommands, engine: &Engine) -> Result<()> {
+pub async fn handle_profile(action: crate::ProfileCommands, engine: &Engine) -> Result<()> {
     match action {
         crate::ProfileCommands::List => {
             let profiles = engine.list_profiles()?;
@@ -81,8 +81,12 @@ pub fn handle_profile(action: crate::ProfileCommands, engine: &Engine) -> Result
             println!("Created profile: {name}");
         }
         crate::ProfileCommands::Switch { name } => {
-            engine.load_profile(&name)?;
-            println!("Switched to profile: {name}");
+            let res = engine.load_profile(&name).await?;
+            println!(
+                "Switched to profile: {name} ({} plugins loaded, {} skipped/failed)",
+                res.loaded_count(),
+                res.problem_count()
+            );
         }
     }
     Ok(())

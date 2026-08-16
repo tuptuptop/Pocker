@@ -1,31 +1,7 @@
-//! Pocker Hub — plugin registry and distribution platform server.
-//!
-//! Provides REST API for:
-//! - Plugin search/discovery
-//! - Plugin publish/pull
-//! - Version management
-//! - Rating system
-//! - Security scanning
-
-mod api;
-mod store;
+//! Pocker Hub — binary entry point.
 
 use std::net::SocketAddr;
-use tracing::info;
-
-/// Run the Hub server.
-///
-/// # Errors
-/// Returns an error if the TCP listener cannot bind to `addr` or the server
-/// terminates with an error.
-pub async fn run(addr: SocketAddr) -> anyhow::Result<()> {
-    let app = api::build_router();
-
-    info!("Pocker Hub server starting on {}", addr);
-    let listener = tokio::net::TcpListener::bind(addr).await?;
-    axum::serve(listener, app).await?;
-    Ok(())
-}
+use std::sync::Arc;
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
@@ -34,5 +10,5 @@ async fn main() -> anyhow::Result<()> {
         .init();
 
     let addr: SocketAddr = "0.0.0.0:8080".parse()?;
-    run(addr).await
+    pocker_hub::run(addr, Arc::new(pocker_engine::Engine::new())).await
 }
