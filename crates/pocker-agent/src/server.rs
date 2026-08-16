@@ -42,11 +42,13 @@ fn now() -> u64 {
         .unwrap_or(0)
 }
 
-fn health() -> impl axum::response::IntoResponse {
+#[allow(clippy::unused_async)]
+async fn health() -> impl axum::response::IntoResponse {
     Json(json!({ "status": "ok" }))
 }
 
-fn models(State(state): State<Arc<AppState>>) -> impl axum::response::IntoResponse {
+#[allow(clippy::unused_async)]
+async fn models(State(state): State<Arc<AppState>>) -> impl axum::response::IntoResponse {
     let m = &state.config.model;
     Json(json!({
         "object": "list",
@@ -61,7 +63,8 @@ async fn chat_completions(
     provider::proxy_chat_completions(&state.config, body).await
 }
 
-fn create_session(
+#[allow(clippy::unused_async)]
+async fn create_session(
     State(state): State<Arc<AppState>>,
     Json(body): Json<Value>,
 ) -> impl axum::response::IntoResponse {
@@ -91,7 +94,8 @@ fn create_session(
     }))
 }
 
-fn list_sessions(State(state): State<Arc<AppState>>) -> impl axum::response::IntoResponse {
+#[allow(clippy::unused_async)]
+async fn list_sessions(State(state): State<Arc<AppState>>) -> impl axum::response::IntoResponse {
     let map = state.sessions.read().unwrap();
     let items: Vec<Value> = map
         .values()
@@ -108,7 +112,8 @@ fn list_sessions(State(state): State<Arc<AppState>>) -> impl axum::response::Int
     Json(json!({ "items": items, "total": items.len() }))
 }
 
-fn get_session(
+#[allow(clippy::unused_async)]
+async fn get_session(
     State(state): State<Arc<AppState>>,
     Path(id): Path<String>,
 ) -> impl axum::response::IntoResponse {
@@ -132,7 +137,8 @@ fn get_session(
     }
 }
 
-fn search_sessions(
+#[allow(clippy::unused_async)]
+async fn search_sessions(
     axum::extract::Query(params): axum::extract::Query<HashMap<String, String>>,
 ) -> impl axum::response::IntoResponse {
     let q = params.get("q").cloned().unwrap_or_default();
@@ -168,14 +174,16 @@ async fn chat_stream_hermes(
     provider::hermes_chat_stream(state.config.clone(), message, model).await
 }
 
-fn messages(
+#[allow(clippy::unused_async)]
+async fn messages(
     _state: State<Arc<AppState>>,
     Path(_id): Path<String>,
 ) -> impl axum::response::IntoResponse {
     Json(json!({ "items": [], "total": 0 }))
 }
 
-fn fork_session(
+#[allow(clippy::unused_async)]
+async fn fork_session(
     State(state): State<Arc<AppState>>,
     Path(id): Path<String>,
 ) -> impl axum::response::IntoResponse {
@@ -208,19 +216,23 @@ fn fork_session(
     }))
 }
 
-fn memory() -> impl axum::response::IntoResponse {
+#[allow(clippy::unused_async)]
+async fn memory() -> impl axum::response::IntoResponse {
     Json(json!({ "object": "memory", "data": [] }))
 }
 
-fn skills() -> impl axum::response::IntoResponse {
+#[allow(clippy::unused_async)]
+async fn skills() -> impl axum::response::IntoResponse {
     Json(json!([]))
 }
 
-fn skills_categories() -> impl axum::response::IntoResponse {
+#[allow(clippy::unused_async)]
+async fn skills_categories() -> impl axum::response::IntoResponse {
     Json(json!([]))
 }
 
-fn config_route(State(state): State<Arc<AppState>>) -> impl axum::response::IntoResponse {
+#[allow(clippy::unused_async)]
+async fn config_route(State(state): State<Arc<AppState>>) -> impl axum::response::IntoResponse {
     Json(json!({
         "model": state.config.model,
         "provider": state.config.provider.as_str(),
