@@ -8,8 +8,9 @@
 use std::env;
 
 /// Which upstream LLM provider the backend proxies to.
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq, Default)]
 pub enum Provider {
+    #[default]
     OpenAi,
     OpenRouter,
     Anthropic,
@@ -25,7 +26,7 @@ impl Provider {
     }
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Default)]
 pub struct Config {
     pub host: String,
     pub port: u16,

@@ -48,7 +48,7 @@ pub async fn proxy_chat_completions(cfg: &Config, mut body: Value) -> Response {
 
     match built.send().await {
         Ok(resp) if resp.status().is_success() => {
-            let stream = resp.bytes_stream().map(|r| r.unwrap_or_default());
+            let stream = resp.bytes_stream();
             Body::from_stream(stream)
                 .into_response()
                 .into_response_with_sse_headers()

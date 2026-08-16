@@ -5,7 +5,7 @@
 use crate::provider;
 use crate::state::{AppState, Session};
 use axum::extract::{Path, State};
-use axum::response::sse::Sse;
+use axum::response::{IntoResponse, sse::Sse};
 use axum::routing::{get, post};
 use axum::{Json, Router};
 use futures::stream::Stream;
@@ -184,8 +184,8 @@ fn fork_session(
         let map = state.sessions.read().unwrap();
         let s = map.get(&id);
         (
-            s.map(|s| s.title.clone()),
-            s.map(|s| s.model.clone()),
+            s.and_then(|s| s.title.clone()),
+            s.and_then(|s| s.model.clone()),
             now(),
         )
     };
