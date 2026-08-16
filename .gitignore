@@ -40,3 +40,6 @@ vendor/hermes-agent-py/*.env
 PockerStudio/pnpm-lock.yaml
 PockerStudio/package-lock.json
 
+# Local project memory / agent workspace (never commit or push)
+.workbuddy/
+
