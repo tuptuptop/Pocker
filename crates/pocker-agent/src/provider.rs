@@ -114,7 +114,7 @@ pub async fn hermes_chat_stream(
                                             let _ = tx.send(Ok(
                                                 Event::default()
                                                     .event("assistant.delta")
-                                                    .data(delta.to_string()),
+                                                    .data(delta),
                                             ));
                                         }
                                     }
