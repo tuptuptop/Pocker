@@ -10,6 +10,7 @@ pub struct PluginTestHarness {
 }
 
 impl PluginTestHarness {
+    #[must_use]
     pub fn new() -> Self {
         Self {
             ctx: Arc::new(Ctx::new()),
@@ -17,6 +18,9 @@ impl PluginTestHarness {
     }
 
     /// Mount a plugin and return a guard that unmounts on drop.
+    ///
+    /// # Errors
+    /// Returns an error if the plugin's `mount` fails.
     pub async fn mount(&self, plugin: &Arc<dyn Plugin>) -> anyhow::Result<MountGuard<'_>> {
         plugin.mount(&self.ctx).await?;
         Ok(MountGuard {
@@ -40,12 +44,17 @@ pub struct MountGuard<'a> {
 
 impl Drop for MountGuard<'_> {
     fn drop(&mut self) {
-        // Fire and forget unmount
-        let ctx = self.ctx.clone();
-        let plugin = self.plugin.clone();
-        tokio::spawn(async move {
-            let _ = plugin.unmount(&ctx).await;
-        });
+        // Best-effort unmount. Only spawn if a tokio runtime is active; outside
+        // one (e.g. a synchronous test setup), spawning would panic.
+        if let Ok(handle) = tokio::runtime::Handle::try_current() {
+            let ctx = self.ctx.clone();
+            let plugin = self.plugin.clone();
+            handle.spawn(async move {
+                let _ = plugin.unmount(&ctx).await;
+            });
+        } else {
+            tracing::warn!("MountGuard dropped outside a tokio runtime; unmount skipped");
+        }
     }
 }
 

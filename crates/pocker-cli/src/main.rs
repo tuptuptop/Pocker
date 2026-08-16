@@ -5,12 +5,12 @@
 //!   pocker tui          — Start TUI
 //!   pocker plugin list  — List installed plugins
 //!   pocker profile list — List profiles
-//!   pocker run <skill>  — Run a skill
+//!   pocker run `<skill>`  — Run a skill
 //!   pocker --dump-config — Dump plugin tree config
 
 mod commands;
 
-use clap::{Parser, Subcommand, CommandFactory};
+use clap::{CommandFactory, Parser, Subcommand};
 
 #[derive(Parser)]
 #[command(
@@ -128,17 +128,19 @@ async fn main() -> anyhow::Result<()> {
     if let Some(profile_name) = &cli.profile {
         if engine.profiles.exists(profile_name) {
             engine.load_profile(profile_name)?;
-            println!("Loaded profile: {}", profile_name);
+            println!("Loaded profile: {profile_name}");
         } else {
-            eprintln!("Profile not found: {}", profile_name);
+            eprintln!("Profile not found: {profile_name}");
         }
     } else if engine.profiles.exists("web") {
         engine.load_profile("web")?;
     } else {
         // Create default profile
-        let _ = engine
-            .profiles
-            .create("default", "Default profile", vec!["@pocker/core-bundle".to_string()]);
+        let _ = engine.profiles.create(
+            "default",
+            "Default profile",
+            vec!["@pocker/core-bundle".to_string()],
+        );
         engine.load_profile("default")?;
     }
 
@@ -174,17 +176,17 @@ async fn main() -> anyhow::Result<()> {
             commands::handle_profile(action, &engine)?;
         }
         Some(Commands::Run { name, input }) => {
-            commands::handle_run(&name, input, &engine).await?;
+            commands::handle_run(&name, input, &engine)?;
         }
         Some(Commands::Hub { action }) => {
             commands::handle_hub(action)?;
         }
         Some(Commands::System { action }) => {
-            commands::handle_system(action, &engine)?;
+            commands::handle_system(&action, &engine)?;
         }
         None => {
             // No command — show help
-            clap::Command::from(Cli::command()).print_help()?;
+            Cli::command().print_help()?;
             println!();
         }
     }

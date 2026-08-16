@@ -24,13 +24,13 @@ pub enum PockerError {
 impl fmt::Display for PockerError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            PockerError::Plugin(msg) => write!(f, "plugin error: {msg}"),
-            PockerError::Seam(msg) => write!(f, "seam error: {msg}"),
-            PockerError::Config(msg) => write!(f, "config error: {msg}"),
-            PockerError::Runtime(msg) => write!(f, "runtime error: {msg}"),
-            PockerError::Io(e) => write!(f, "io error: {e}"),
-            PockerError::Serde(e) => write!(f, "serde error: {e}"),
-            PockerError::Other(e) => write!(f, "{e}"),
+            Self::Plugin(msg) => write!(f, "plugin error: {msg}"),
+            Self::Seam(msg) => write!(f, "seam error: {msg}"),
+            Self::Config(msg) => write!(f, "config error: {msg}"),
+            Self::Runtime(msg) => write!(f, "runtime error: {msg}"),
+            Self::Io(e) => write!(f, "io error: {e}"),
+            Self::Serde(e) => write!(f, "serde error: {e}"),
+            Self::Other(e) => write!(f, "{e}"),
         }
     }
 }
@@ -38,9 +38,9 @@ impl fmt::Display for PockerError {
 impl std::error::Error for PockerError {
     fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
         match self {
-            PockerError::Io(e) => Some(e),
-            PockerError::Serde(e) => Some(e),
-            PockerError::Other(e) => Some(e.as_ref()),
+            Self::Io(e) => Some(e),
+            Self::Serde(e) => Some(e),
+            Self::Other(e) => Some(e.as_ref()),
             _ => None,
         }
     }
@@ -48,25 +48,25 @@ impl std::error::Error for PockerError {
 
 impl From<std::io::Error> for PockerError {
     fn from(e: std::io::Error) -> Self {
-        PockerError::Io(e)
+        Self::Io(e)
     }
 }
 
 impl From<serde_json::Error> for PockerError {
     fn from(e: serde_json::Error) -> Self {
-        PockerError::Serde(e)
+        Self::Serde(e)
     }
 }
 
 impl From<anyhow::Error> for PockerError {
     fn from(e: anyhow::Error) -> Self {
-        PockerError::Other(e)
+        Self::Other(e)
     }
 }
 
 impl From<serde_yaml::Error> for PockerError {
     fn from(e: serde_yaml::Error) -> Self {
-        PockerError::Config(e.to_string())
+        Self::Config(e.to_string())
     }
 }
 

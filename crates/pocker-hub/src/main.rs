@@ -14,6 +14,10 @@ use std::net::SocketAddr;
 use tracing::info;
 
 /// Run the Hub server.
+///
+/// # Errors
+/// Returns an error if the TCP listener cannot bind to `addr` or the server
+/// terminates with an error.
 pub async fn run(addr: SocketAddr) -> anyhow::Result<()> {
     let app = api::build_router();
 

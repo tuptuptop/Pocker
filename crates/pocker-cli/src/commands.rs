@@ -1,7 +1,7 @@
 //! CLI command handlers.
 
-use pocker_engine::Engine;
 use anyhow::Result;
+use pocker_engine::Engine;
 
 use clap::Subcommand;
 
@@ -14,8 +14,14 @@ pub enum PluginCommands {
 #[derive(Subcommand)]
 pub enum ProfileCommands {
     List,
-    Create { name: String, #[arg(long, default_value = "")] description: String },
-    Switch { name: String },
+    Create {
+        name: String,
+        #[arg(long, default_value = "")]
+        description: String,
+    },
+    Switch {
+        name: String,
+    },
 }
 
 #[derive(Subcommand)]
@@ -24,11 +30,12 @@ pub enum HubCommands {
     Info { name: String },
 }
 
-#[derive(Subcommand)]
+#[derive(Clone, Copy, Subcommand)]
 pub enum SystemCommands {
     Info,
 }
 
+#[allow(clippy::unnecessary_wraps)]
 pub fn handle_plugin(action: crate::PluginCommands, engine: &Engine) -> Result<()> {
     match action {
         crate::PluginCommands::List => {
@@ -40,18 +47,19 @@ pub fn handle_plugin(action: crate::PluginCommands, engine: &Engine) -> Result<(
                 println!("{:-<50}", "");
                 for (name, mounted) in plugins {
                     let status = if mounted { "mounted" } else { "registered" };
-                    println!("{:<30} {}", name, status);
+                    println!("{name:<30} {status}");
                 }
             }
         }
         crate::PluginCommands::Info { name } => {
-            println!("Plugin: {}", name);
+            println!("Plugin: {name}");
             // TODO: Show detailed plugin info
         }
     }
     Ok(())
 }
 
+#[allow(clippy::unnecessary_wraps)]
 pub fn handle_profile(action: crate::ProfileCommands, engine: &Engine) -> Result<()> {
     match action {
         crate::ProfileCommands::List => {
@@ -64,45 +72,43 @@ pub fn handle_profile(action: crate::ProfileCommands, engine: &Engine) -> Result
                 let current = engine.current_profile();
                 for name in profiles {
                     let status = if name == current { "* active" } else { "" };
-                    println!("{:<20} {}", name, status);
+                    println!("{name:<20} {status}");
                 }
             }
         }
         crate::ProfileCommands::Create { name, description } => {
             engine.profiles.create(&name, &description, vec![])?;
-            println!("Created profile: {}", name);
+            println!("Created profile: {name}");
         }
         crate::ProfileCommands::Switch { name } => {
             engine.load_profile(&name)?;
-            println!("Switched to profile: {}", name);
+            println!("Switched to profile: {name}");
         }
     }
     Ok(())
 }
 
-pub async fn handle_run(
-    name: &str,
-    input: Option<String>,
-    _engine: &Engine,
-) -> Result<()> {
-    println!("Running skill: {}", name);
+#[allow(clippy::unnecessary_wraps)]
+pub fn handle_run(name: &str, input: Option<String>, _engine: &Engine) -> Result<()> {
+    println!("Running skill: {name}");
     if let Some(input) = input {
-        println!("Input: {}", input);
+        println!("Input: {input}");
     }
     // TODO: Look up skill in ctx.skills and execute it
     println!("Skill execution not yet implemented.");
     Ok(())
 }
 
+#[allow(clippy::unnecessary_wraps)]
 pub fn handle_hub(action: crate::HubCommands) -> Result<()> {
     match action {
         crate::HubCommands::Search { query } => {
-            println!("Searching Hub for: {}", query);
+            println!("Searching Hub for: {query}");
             // TODO: Connect to Pocker Hub and search
             println!("Hub search not yet implemented.");
         }
         crate::HubCommands::Info { name } => {
-            println!("Hub info for: {}", name);
+            println!("Hub info for: {name}");
             // TODO: Fetch info from Hub
             println!("Hub info not yet implemented.");
         }
@@ -110,7 +116,8 @@ pub fn handle_hub(action: crate::HubCommands) -> Result<()> {
     Ok(())
 }
 
-pub fn handle_system(action: crate::SystemCommands, engine: &Engine) -> Result<()> {
+#[allow(clippy::unnecessary_wraps)]
+pub fn handle_system(action: &crate::SystemCommands, engine: &Engine) -> Result<()> {
     match action {
         crate::SystemCommands::Info => {
             println!("Pocker System Information");

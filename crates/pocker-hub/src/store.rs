@@ -65,7 +65,7 @@ mod tests {
         meta.description = "A test plugin".to_string();
         meta.plugin_type = PluginType::Tool;
 
-        store.publish(meta.clone());
+        store.publish(meta);
         let got = store.get("test-plugin").unwrap();
         assert_eq!(got.name, "test-plugin");
         assert_eq!(got.version, "1.0.0");

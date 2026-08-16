@@ -5,7 +5,7 @@
 //!
 //! Architecture:
 //! - Rust backend: API server, SSE streaming, WebSocket
-//! - TypeScript frontend: React + TanStack + Zustand (in studio-web/)
+//! - TypeScript frontend: React + `TanStack` + Zustand (in studio-web/)
 
 use axum::Router;
 use std::net::SocketAddr;
@@ -16,6 +16,10 @@ use tracing::info;
 mod api;
 
 /// Run the Studio server.
+///
+/// # Errors
+/// Returns an error if the underlying HTTP server fails to bind or terminates
+/// with an error.
 pub async fn run(addr: SocketAddr, static_dir: Option<std::path::PathBuf>) -> anyhow::Result<()> {
     let mut router = Router::new()
         .merge(api::build_router())
@@ -44,8 +48,7 @@ async fn main() -> anyhow::Result<()> {
     let addr: SocketAddr = "127.0.0.1:3080".parse()?;
 
     // Look for built frontend in conventional locations
-    let static_dir = dirs::home_dir()
-        .map(|h| h.join(".pocker").join("studio").join("dist"));
+    let static_dir = dirs::home_dir().map(|h| h.join(".pocker").join("studio").join("dist"));
 
     run(addr, static_dir).await
 }

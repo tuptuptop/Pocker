@@ -1,6 +1,6 @@
 //! Hub API routes.
 
-use axum::{routing::get, Router, Json};
+use axum::{routing::get, Json, Router};
 use serde_json::{json, Value};
 
 pub fn build_router() -> Router {
@@ -16,14 +16,16 @@ async fn health() -> Json<Value> {
     json!({
         "status": "ok",
         "service": "pocker-hub"
-    }).into()
+    })
+    .into()
 }
 
 async fn version() -> Json<Value> {
     json!({
         "name": "pocker-hub",
         "version": env!("CARGO_PKG_VERSION"),
-    }).into()
+    })
+    .into()
 }
 
 async fn list_plugins() -> Json<Value> {
@@ -31,16 +33,20 @@ async fn list_plugins() -> Json<Value> {
     json!({
         "plugins": [],
         "total": 0,
-    }).into()
+    })
+    .into()
 }
 
-async fn search(axum::extract::Query(params): axum::extract::Query<std::collections::HashMap<String, String>>) -> Json<Value> {
+async fn search(
+    axum::extract::Query(params): axum::extract::Query<std::collections::HashMap<String, String>>,
+) -> Json<Value> {
     let query = params.get("q").cloned().unwrap_or_default();
     // TODO: Search in database
     json!({
         "query": query,
         "results": [],
-    }).into()
+    })
+    .into()
 }
 
 async fn plugin_info(axum::extract::Path(name): axum::extract::Path<String>) -> Json<Value> {
@@ -49,7 +55,8 @@ async fn plugin_info(axum::extract::Path(name): axum::extract::Path<String>) -> 
         "name": name,
         "found": false,
         "message": "Plugin not found",
-    }).into()
+    })
+    .into()
 }
 
 #[cfg(test)]
@@ -63,7 +70,12 @@ mod tests {
     async fn test_health() {
         let app = build_router();
         let response = app
-            .oneshot(Request::builder().uri("/health").body(Body::empty()).unwrap())
+            .oneshot(
+                Request::builder()
+                    .uri("/health")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
             .await
             .unwrap();
         assert_eq!(response.status(), StatusCode::OK);
@@ -73,7 +85,12 @@ mod tests {
     async fn test_version() {
         let app = build_router();
         let response = app
-            .oneshot(Request::builder().uri("/v1/version").body(Body::empty()).unwrap())
+            .oneshot(
+                Request::builder()
+                    .uri("/v1/version")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
             .await
             .unwrap();
         assert_eq!(response.status(), StatusCode::OK);
@@ -83,7 +100,12 @@ mod tests {
     async fn test_list_plugins() {
         let app = build_router();
         let response = app
-            .oneshot(Request::builder().uri("/v1/plugins").body(Body::empty()).unwrap())
+            .oneshot(
+                Request::builder()
+                    .uri("/v1/plugins")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
             .await
             .unwrap();
         assert_eq!(response.status(), StatusCode::OK);
@@ -93,7 +115,12 @@ mod tests {
     async fn test_search() {
         let app = build_router();
         let response = app
-            .oneshot(Request::builder().uri("/v1/search?q=test").body(Body::empty()).unwrap())
+            .oneshot(
+                Request::builder()
+                    .uri("/v1/search?q=test")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
             .await
             .unwrap();
         assert_eq!(response.status(), StatusCode::OK);

@@ -57,7 +57,8 @@ pub fn handle_input(app: &mut App) -> anyhow::Result<bool> {
             KeyCode::Enter => {
                 if !app.input.is_empty() {
                     app.messages.push(format!("> {}", app.input));
-                    app.messages.push("(not yet connected to engine)".to_string());
+                    app.messages
+                        .push("(not yet connected to engine)".to_string());
                     app.input.clear();
                 }
             }

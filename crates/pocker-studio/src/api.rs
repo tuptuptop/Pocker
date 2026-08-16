@@ -1,6 +1,10 @@
 //! Studio API routes.
 
-use axum::{routing::{get, post}, Router, Json, extract::State};
+use axum::{
+    extract::State,
+    routing::{get, post},
+    Json, Router,
+};
 use serde_json::{json, Value};
 
 #[derive(Clone)]
@@ -24,21 +28,24 @@ async fn health() -> Json<Value> {
     json!({
         "status": "ok",
         "service": "pocker-studio"
-    }).into()
+    })
+    .into()
 }
 
 async fn version() -> Json<Value> {
     json!({
         "name": "pocker-studio",
         "version": env!("CARGO_PKG_VERSION"),
-    }).into()
+    })
+    .into()
 }
 
 async fn list_plugins(State(_state): State<StudioState>) -> Json<Value> {
     // TODO: Query from engine
     json!({
         "plugins": [],
-    }).into()
+    })
+    .into()
 }
 
 async fn list_profiles(State(_state): State<StudioState>) -> Json<Value> {
@@ -46,7 +53,8 @@ async fn list_profiles(State(_state): State<StudioState>) -> Json<Value> {
     json!({
         "profiles": ["web", "cli", "tui", "headless"],
         "current": "web",
-    }).into()
+    })
+    .into()
 }
 
 #[derive(serde::Deserialize)]
@@ -54,10 +62,7 @@ struct ChatRequest {
     message: String,
 }
 
-async fn chat(
-    State(_state): State<StudioState>,
-    Json(req): Json<ChatRequest>,
-) -> Json<Value> {
+async fn chat(State(_state): State<StudioState>, Json(req): Json<ChatRequest>) -> Json<Value> {
     // TODO: Forward to engine → agent loop → LLM
     json!({
         "reply": format!("Echo: {} (engine not yet connected)", req.message),
@@ -65,7 +70,8 @@ async fn chat(
             "input_tokens": 0,
             "output_tokens": 0,
         },
-    }).into()
+    })
+    .into()
 }
 
 #[cfg(test)]
@@ -79,7 +85,12 @@ mod tests {
     async fn test_health() {
         let app = build_router();
         let response = app
-            .oneshot(Request::builder().uri("/api/health").body(Body::empty()).unwrap())
+            .oneshot(
+                Request::builder()
+                    .uri("/api/health")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
             .await
             .unwrap();
         assert_eq!(response.status(), StatusCode::OK);
@@ -89,7 +100,12 @@ mod tests {
     async fn test_list_profiles() {
         let app = build_router();
         let response = app
-            .oneshot(Request::builder().uri("/api/profiles").body(Body::empty()).unwrap())
+            .oneshot(
+                Request::builder()
+                    .uri("/api/profiles")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
             .await
             .unwrap();
         assert_eq!(response.status(), StatusCode::OK);

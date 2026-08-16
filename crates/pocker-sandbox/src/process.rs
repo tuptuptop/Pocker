@@ -34,18 +34,24 @@ impl Sandbox {
     }
 
     /// Set the timeout in seconds.
-    pub fn timeout(mut self, secs: u64) -> Self {
+    #[must_use]
+    pub const fn timeout(mut self, secs: u64) -> Self {
         self.timeout_secs = secs;
         self
     }
 
     /// Allow or deny network access.
-    pub fn network(mut self, allowed: bool) -> Self {
+    #[must_use]
+    pub const fn network(mut self, allowed: bool) -> Self {
         self.network_allowed = allowed;
         self
     }
 
     /// Execute a command in the sandbox.
+    ///
+    /// # Errors
+    /// Returns an error if the program cannot be spawned, if execution exceeds
+    /// the configured timeout, or if waiting for its output fails.
     pub async fn run(&self, program: &str, args: &[&str]) -> anyhow::Result<SandboxResult> {
         let start = std::time::Instant::now();
 
@@ -67,12 +73,14 @@ impl Sandbox {
                 child.wait_with_output(),
             )
             .await
-            .map_err(|_| anyhow::anyhow!("sandbox execution timed out after {}s", self.timeout_secs))??
+            .map_err(|_| {
+                anyhow::anyhow!("sandbox execution timed out after {}s", self.timeout_secs)
+            })??
         } else {
             child.wait_with_output().await?
         };
 
-        let duration_ms = start.elapsed().as_millis() as u64;
+        let duration_ms = u64::try_from(start.elapsed().as_millis()).unwrap_or(u64::MAX);
 
         Ok(SandboxResult {
             success: output.status.success(),

@@ -15,7 +15,11 @@ mod app;
 mod ui;
 
 /// Run the TUI.
-pub async fn run() -> Result<()> {
+///
+/// # Errors
+/// Returns an error if the terminal cannot be set up, the UI event loop fails,
+/// or the terminal cannot be restored on exit.
+pub fn run() -> Result<()> {
     // Setup terminal
     enable_raw_mode()?;
     execute!(stdout(), EnterAlternateScreen)?;
@@ -47,5 +51,5 @@ pub async fn run() -> Result<()> {
 #[tokio::main]
 async fn main() -> Result<()> {
     println!("Pocker TUI — starting...");
-    run().await
+    run()
 }

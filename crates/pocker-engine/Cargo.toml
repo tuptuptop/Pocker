@@ -8,6 +8,7 @@ description = "Pocker Engine — plugin loader, profile manager, and runtime"
 [dependencies]
 pocker-core = { workspace = true }
 pocker-plugin = { workspace = true }
+futures = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
 serde_yaml = { workspace = true }

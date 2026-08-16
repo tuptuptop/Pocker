@@ -91,6 +91,7 @@ impl PluginHandle {
         }
     }
 
+    #[must_use]
     pub fn is_mounted(&self) -> bool {
         self.state.load(Ordering::SeqCst)
     }

@@ -37,16 +37,33 @@ pub struct ToolDefinition {
     pub name: String,
     pub description: String,
     pub input_schema: serde_json::Value,
+    /// Optional output schema (Harness-style). Lets the model and UI know the
+    /// shape of a tool's result. `None` means unspecified.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub output_schema: Option<serde_json::Value>,
+    /// Optional cooperative timeout budget in milliseconds (Harness-style).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub timeout_ms: Option<u64>,
 }
 
 /// LLM streaming chunk.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum Chunk {
-    Text { content: String },
-    ToolCall { id: String, name: String, arguments: serde_json::Value },
-    Done { usage: Option<Usage> },
-    Error { message: String },
+    Text {
+        content: String,
+    },
+    ToolCall {
+        id: String,
+        name: String,
+        arguments: serde_json::Value,
+    },
+    Done {
+        usage: Option<Usage>,
+    },
+    Error {
+        message: String,
+    },
 }
 
 /// Token usage info.
@@ -62,6 +79,10 @@ pub struct ModelInfo {
     pub id: String,
     pub name: String,
     pub context_window: u64,
+    /// Owning provider (e.g. "openai", "ollama", "deepseek").
+    /// Namespaced so multi-provider adapters can coexist without id collisions.
+    #[serde(default)]
+    pub provider: String,
 }
 
 /// LLM capabilities.
@@ -105,6 +126,31 @@ pub struct SkillDefinition {
     pub requires: Vec<String>,
 }
 
+/// A Harness-style instruction skill.
+///
+/// This is a Markdown body discovered by an LLM router and injected into
+/// context. Unlike [`SkillDefinition`] (a typed executable capability with
+/// input/output schemas), this is prompt/instruction content that the model
+/// "follows" rather than a function it calls.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct InstructionSkill {
+    /// Kebab-case identifier used to address the skill.
+    pub name: String,
+    /// Short routing description shown by discovery consumers.
+    pub description: String,
+    /// Optional extra routing guidance ("when to use this skill").
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub when_to_use: Option<String>,
+    /// Markdown instruction body.
+    pub content: String,
+    /// Provider that owns this skill body.
+    #[serde(default)]
+    pub provider: String,
+    /// Skill version.
+    #[serde(default)]
+    pub version: String,
+}
+
 /// Plugin type classification.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
@@ -144,6 +190,7 @@ impl PluginId {
         }
     }
 
+    #[must_use]
     pub fn parse(s: &str) -> Self {
         // Use rsplit_once to handle scoped names like "@pocker/llm-openai@1.0.0"
         if let Some((name, version)) = s.rsplit_once('@') {
@@ -171,16 +218,6 @@ impl PluginId {
 impl std::fmt::Display for PluginId {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}@{}", self.name, self.version)
-    }
-}
-
-/// Profile name (web / cli / tui / headless).
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
-pub struct ProfileName(pub String);
-
-impl Default for ProfileName {
-    fn default() -> Self {
-        Self("web".to_string())
     }
 }
 

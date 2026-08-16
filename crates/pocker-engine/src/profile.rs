@@ -27,6 +27,10 @@ pub struct ProfileManager {
 
 impl ProfileManager {
     /// Create a profile manager using the default ~/.pocker directory.
+    ///
+    /// # Errors
+    /// Returns [`ProfileError::NoHomeDir`] if the user's home directory cannot
+    /// be resolved.
     pub fn new() -> Result<Self, ProfileError> {
         let home = dirs::home_dir().ok_or(ProfileError::NoHomeDir)?;
         Ok(Self {
@@ -42,16 +46,22 @@ impl ProfileManager {
     }
 
     /// Get the directory for a specific profile.
+    #[must_use]
     pub fn profile_dir(&self, name: &str) -> PathBuf {
         self.base_dir.join(name)
     }
 
     /// Get the path to a profile's config file.
+    #[must_use]
     pub fn profile_path(&self, name: &str) -> PathBuf {
         self.profile_dir(name).join("profile.yaml")
     }
 
     /// List all profile names.
+    ///
+    /// # Errors
+    /// Returns [`ProfileError::Io`] if the profiles directory exists but cannot
+    /// be read.
     pub fn list(&self) -> Result<Vec<String>, ProfileError> {
         if !self.base_dir.exists() {
             return Ok(Vec::new());
@@ -70,6 +80,11 @@ impl ProfileManager {
     }
 
     /// Load a profile by name.
+    ///
+    /// # Errors
+    /// Returns [`ProfileError::NotFound`] if the profile file is missing, or
+    /// [`ProfileError::Io`]/[`ProfileError::Yaml`] if it cannot be read or
+    /// parsed.
     pub fn load(&self, name: &str) -> Result<Profile, ProfileError> {
         let path = self.profile_path(name);
         if !path.exists() {
@@ -81,6 +96,11 @@ impl ProfileManager {
     }
 
     /// Save a profile.
+    ///
+    /// # Errors
+    /// Returns [`ProfileError::Io`] if the directory cannot be created or the
+    /// file cannot be written, or [`ProfileError::Yaml`] if serialization
+    /// fails.
     pub fn save(&self, profile: &Profile) -> Result<(), ProfileError> {
         let dir = self.profile_dir(&profile.name);
         std::fs::create_dir_all(&dir)?;
@@ -90,7 +110,16 @@ impl ProfileManager {
     }
 
     /// Create a new profile from a template.
-    pub fn create(&self, name: &str, description: &str, bundles: Vec<String>) -> Result<Profile, ProfileError> {
+    ///
+    /// # Errors
+    /// Returns [`ProfileError::AlreadyExists`] if a profile with the same name
+    /// already exists, or propagates the error from [`ProfileManager::save`].
+    pub fn create(
+        &self,
+        name: &str,
+        description: &str,
+        bundles: Vec<String>,
+    ) -> Result<Profile, ProfileError> {
         if self.profile_path(name).exists() {
             return Err(ProfileError::AlreadyExists(name.to_string()));
         }
@@ -106,6 +135,10 @@ impl ProfileManager {
     }
 
     /// Delete a profile.
+    ///
+    /// # Errors
+    /// Returns [`ProfileError::NotFound`] if the profile directory does not
+    /// exist, or [`ProfileError::Io`] if the directory cannot be removed.
     pub fn delete(&self, name: &str) -> Result<(), ProfileError> {
         let dir = self.profile_dir(name);
         if !dir.exists() {
@@ -116,6 +149,7 @@ impl ProfileManager {
     }
 
     /// Check if a profile exists.
+    #[must_use]
     pub fn exists(&self, name: &str) -> bool {
         self.profile_path(name).exists()
     }
@@ -140,7 +174,11 @@ mod tests {
         let pm = ProfileManager::with_base_dir(tmp.path());
 
         let profile = pm
-            .create("test", "Test profile", vec!["@pocker/core-bundle".to_string()])
+            .create(
+                "test",
+                "Test profile",
+                vec!["@pocker/core-bundle".to_string()],
+            )
             .unwrap();
 
         assert_eq!(profile.name, "test");

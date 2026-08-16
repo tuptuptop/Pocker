@@ -51,6 +51,7 @@ pub struct EventMap {
 }
 
 impl EventMap {
+    #[must_use]
     pub fn new() -> Self {
         Self {
             handlers: HashMap::new(),
@@ -75,16 +76,15 @@ impl EventMap {
     }
 
     /// List all event names that have subscribers.
+    #[must_use]
     pub fn list(&self) -> Vec<String> {
         self.handlers.keys().cloned().collect()
     }
 
     /// Count subscribers for a specific event.
+    #[must_use]
     pub fn subscriber_count(&self, event_name: &str) -> usize {
-        self.handlers
-            .get(event_name)
-            .map(|h| h.len())
-            .unwrap_or(0)
+        self.handlers.get(event_name).map_or(0, std::vec::Vec::len)
     }
 }
 

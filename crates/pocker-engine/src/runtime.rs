@@ -26,8 +26,18 @@ pub struct Engine {
 
 impl Engine {
     /// Create a new engine with the default profile directory.
+    #[must_use]
     pub fn new() -> Self {
-        let profiles = ProfileManager::new().unwrap_or_default();
+        let profiles = match ProfileManager::new() {
+            Ok(pm) => pm,
+            Err(e) => {
+                tracing::warn!(
+                    error = %e,
+                    "home directory unavailable; falling back to a CWD-relative profile dir"
+                );
+                ProfileManager::default()
+            }
+        };
         Self {
             ctx: Arc::new(Ctx::new()),
             loader: PluginLoader::new(),
@@ -48,42 +58,69 @@ impl Engine {
     }
 
     /// Get the shared context.
-    pub fn context(&self) -> &Arc<Ctx> {
+    pub const fn context(&self) -> &Arc<Ctx> {
         &self.ctx
     }
 
     /// Register a plugin (does not mount).
+    ///
+    /// # Errors
+    /// Propagates the error from [`crate::loader::PluginLoader::register`].
     pub fn register_plugin(&self, name: &str, plugin: Arc<dyn Plugin>) -> Result<()> {
         self.loader.register(name, plugin)
     }
 
     /// Mount a specific plugin.
+    ///
+    /// # Errors
+    /// Propagates the error from [`crate::loader::PluginLoader::mount`].
     pub async fn mount_plugin(&self, name: &str) -> Result<()> {
         self.loader.mount(name, &self.ctx).await
     }
 
     /// Unmount a specific plugin.
+    ///
+    /// # Errors
+    /// Propagates the error from [`crate::loader::PluginLoader::unmount`].
     pub async fn unmount_plugin(&self, name: &str) -> Result<()> {
         self.loader.unmount(name, &self.ctx).await
     }
 
     /// Unmount all plugins (cleanup).
+    ///
+    /// # Errors
+    /// Never fails: delegates to
+    /// [`crate::loader::PluginLoader::unmount_all`], which swallows
+    /// per-plugin errors.
     pub async fn shutdown(&self) -> Result<()> {
         info!("engine shutting down");
         self.loader.unmount_all(&self.ctx).await
     }
 
     /// Get the current profile name.
+    ///
+    /// # Panics
+    /// Panics if the internal current-profile lock is poisoned.
     pub fn current_profile(&self) -> String {
         self.current_profile.read().unwrap().clone()
     }
 
     /// Load and activate a profile.
+    ///
+    /// # Errors
+    /// Returns [`pocker_core::error::PockerError::Config`] if the profile file
+    /// cannot be read or parsed.
+    ///
+    /// # Panics
+    /// Panics if the internal current-profile lock is poisoned.
     pub fn load_profile(&self, name: &str) -> Result<Profile> {
         let profile = self
             .profiles
             .load(name)
             .map_err(|e| pocker_core::error::PockerError::Config(e.to_string()))?;
+        // Apply the profile's config patch on top of the current config so
+        // `ctx.config_get` resolves real values (e.g. llm.default_model).
+        self.ctx.apply_patch(&profile.patch);
         self.ctx.set_profile(profile.clone());
         *self.current_profile.write().unwrap() = name.to_string();
         info!(profile = name, "profile loaded");
@@ -91,6 +128,10 @@ impl Engine {
     }
 
     /// List all available profiles.
+    ///
+    /// # Errors
+    /// Returns [`pocker_core::error::PockerError::Config`] if the profile
+    /// directory cannot be enumerated.
     pub fn list_profiles(&self) -> Result<Vec<String>> {
         self.profiles
             .list()
@@ -98,6 +139,9 @@ impl Engine {
     }
 
     /// Dump the engine state (for `pocker --dump-config`).
+    ///
+    /// # Errors
+    /// This function does not return a `Result`; it always succeeds.
     pub fn dump(&self) -> serde_json::Value {
         let plugins = self.loader.list();
         serde_json::json!({
@@ -157,14 +201,8 @@ mod tests {
         engine.mount_plugin("noop").await.unwrap();
 
         let dump = engine.dump();
-        assert_eq!(
-            dump["engine"]["plugins"][0]["name"],
-            "noop"
-        );
-        assert_eq!(
-            dump["engine"]["plugins"][0]["mounted"],
-            true
-        );
+        assert_eq!(dump["engine"]["plugins"][0]["name"], "noop");
+        assert_eq!(dump["engine"]["plugins"][0]["mounted"], true);
     }
 
     #[tokio::test]
@@ -209,5 +247,28 @@ mod tests {
         let profile = engine.load_profile("test").unwrap();
         assert_eq!(profile.name, "test");
         assert_eq!(engine.current_profile(), "test");
+    }
+
+    #[test]
+    fn engine_load_profile_applies_patch() {
+        let tmp = tempdir().unwrap();
+        let pm = ProfileManager::with_base_dir(tmp.path());
+        let profile = Profile {
+            name: "cfg".to_string(),
+            description: "cfg".to_string(),
+            bundles: Vec::new(),
+            plugins: Vec::new(),
+            patch: serde_json::json!({ "llm": { "default_model": "deepseek-chat" } }),
+        };
+        pm.save(&profile).unwrap();
+
+        let engine = Engine::with_profile_dir(tmp.path());
+        engine.load_profile("cfg").unwrap();
+
+        // The profile's config patch must be merged into the context config.
+        assert_eq!(
+            engine.ctx.config_get("llm.default_model"),
+            Some(serde_json::json!("deepseek-chat"))
+        );
     }
 }

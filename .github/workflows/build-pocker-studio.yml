@@ -15,6 +15,60 @@ env:
 
 jobs:
   # ───────────────────────────────────────────
+  # Lint gate — default clippy, deny any warning
+  # ───────────────────────────────────────────
+  lint:
+    name: Lint (clippy -D warnings)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy
+
+      - name: Cache Cargo
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: cargo-lint-${{ hashFiles('**/Cargo.toml') }}
+          restore-keys: cargo-lint-
+
+      - name: Clippy (deny warnings)
+        run: cargo clippy --all-targets -- -D warnings
+
+  # ───────────────────────────────────────────
+  # Test gate — run the full workspace test suite
+  # ───────────────────────────────────────────
+  test:
+    name: Test (cargo test)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache Cargo
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: cargo-test-${{ hashFiles('**/Cargo.toml') }}
+          restore-keys: cargo-test-
+
+      - name: Run tests
+        run: cargo test --all-targets --workspace
+
+  # ───────────────────────────────────────────
   # Build Rust Engine (pocker-studio binary)
   # ───────────────────────────────────────────
   build-engine:
@@ -77,7 +131,7 @@ jobs:
   # ───────────────────────────────────────────
   build-studio:
     name: Build Studio (${{ matrix.os }})
-    needs: build-engine
+    needs: [build-engine, lint, test]
     strategy:
       fail-fast: false
       matrix:
