@@ -195,6 +195,17 @@ jobs:
         working-directory: PockerStudio
         run: pnpm install --no-frozen-lockfile
 
+      - name: Patch node-gyp to recognize Visual Studio 2025 (Windows)
+        # @electron/rebuild uses node-gyp 9.4.1, which does not know Visual
+        # Studio 2025 (versionMajor 18). This patches getVersionInfo() in every
+        # node-gyp copy under node_modules so the Windows build can find VS and
+        # compile node-pty from source. Must run after install, before the
+        # electron-builder step that triggers the node-pty rebuild.
+        if: matrix.os == 'windows-latest'
+        working-directory: PockerStudio
+        run: |
+          node -e 'const fs=require("fs");const path=require("path");const nm=path.resolve("node_modules");const A="    if (ret.versionMajor === 17) {\n      ret.versionYear = 2022\n      return ret\n    }";const R="    if (ret.versionMajor === 17) {\n      ret.versionYear = 2022\n      return ret\n    }\n    if (ret.versionMajor === 18) {\n      ret.versionYear = 2022\n      return ret\n    }";let s=0,p=0;function w(d){let e;try{e=fs.readdirSync(d,{withFileTypes:true})}catch{return}for(const f of e){if(f.isSymbolicLink())continue;const full=path.join(d,f.name);if(!f.isDirectory()){if(f.name==="find-visualstudio.js"){s++;let c;try{c=fs.readFileSync(full,"utf8")}catch{return}if(c.includes("ret.versionMajor === 18"))return;if(!c.includes(A))return;fs.writeFileSync(full,c.replace(A,R));p++;console.log("patched:",full)}continue}w(full)}}w(nm);console.log("node-gyp VS2025 shim: scanned "+s+", patched "+p+".");if(s===0)console.log("WARNING: no node-gyp find-visualstudio.js found");'
+
       - name: Build frontend
         working-directory: PockerStudio
         run: pnpm run build

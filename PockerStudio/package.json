@@ -118,7 +118,7 @@
     "url": "https://github.com/samcaicn/gloai.git"
   },
   "pnpm": {
-    "onlyBuiltDependencies": ["better-sqlite3", "esbuild", "node-pty", "unrs-resolver"],
+    "onlyBuiltDependencies": ["better-sqlite3", "esbuild", "unrs-resolver"],
     "overrides": {
       "node-gyp": "^10.0.0"
     }
