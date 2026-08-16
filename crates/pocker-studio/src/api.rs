@@ -177,7 +177,13 @@ mod tests {
 
     #[tokio::test]
     async fn test_plugin_info_found() {
-        let app = router();
+        // Register the built-in core plugin into the loader so the API has
+        // real metadata to surface.
+        let engine = Arc::new(Engine::new());
+        engine
+            .register_plugin("@pocker/core", Arc::new(pocker_engine::CoreBundlePlugin::new()))
+            .unwrap();
+        let app = build_router(engine);
         let response = app
             .oneshot(
                 Request::builder()
@@ -192,8 +198,6 @@ mod tests {
             .await
             .unwrap();
         let value: Value = serde_json::from_slice(&body).unwrap();
-        // `@pocker/core` is registered as a factory but not mounted until a
-        // profile loads it, so found=true but mounted=false is expected here.
         assert_eq!(value["found"], true);
         assert_eq!(value["metadata"]["name"], "@pocker/core");
     }

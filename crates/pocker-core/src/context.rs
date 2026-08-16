@@ -5,6 +5,7 @@
 //! There is no privileged core; the context is just a shared bus.
 
 use crate::event::EventMap;
+use crate::plugin::{PluginDigest, PluginMetadata};
 use crate::seam::{Seam, SeamId, SeamRegistry};
 use crate::types::Profile;
 use std::collections::HashMap;
@@ -26,6 +27,10 @@ pub struct Ctx {
     profile: RwLock<Profile>,
     /// Arbitrary key-value store for plugin-specific data
     store: RwLock<HashMap<String, serde_json::Value>>,
+    /// Content-addressed plugin ledger — Pocker's "layer" ledger. Maps each
+    /// plugin digest to its metadata so the context can prove exactly which
+    /// plugin layers are mounted (see [`Ctx::dump`]).
+    plugin_index: RwLock<HashMap<PluginDigest, PluginMetadata>>,
 }
 
 impl Ctx {
@@ -44,17 +49,56 @@ impl Ctx {
                 patch: serde_json::Value::Null,
             }),
             store: RwLock::new(HashMap::new()),
+            plugin_index: RwLock::new(HashMap::new()),
         }
     }
 
-    /// Register an implementation on a seam.
+    /// Register an implementation on a seam, attributed to a plugin digest.
+    ///
+    /// The `digest` is the content-addressed identity of the owning plugin
+    /// (Pocker's "layer"). It travels with the registration so the seam
+    /// registry can later report which plugin provided each capability.
     ///
     /// # Panics
     /// Panics if the internal seam registry lock is poisoned.
-    pub fn register_seam(&self, seam: SeamId, provider: String, implementation: Arc<dyn Seam>) {
+    pub fn register_seam(
+        &self,
+        seam: SeamId,
+        provider: String,
+        digest: PluginDigest,
+        implementation: Arc<dyn Seam>,
+    ) {
         let mut seams = self.seams.write().unwrap();
-        tracing::debug!(seam = %seam, provider = %provider, "registering seam");
-        seams.register(seam, provider, implementation);
+        tracing::debug!(seam = %seam, provider = %provider, digest = %digest, "registering seam");
+        seams.register(seam, provider, digest, implementation);
+    }
+
+    /// Record a plugin's content-addressed identity in the context ledger.
+    ///
+    /// Call this once when a plugin is successfully mounted so the context can
+    /// later prove (via [`Ctx::dump`]) exactly which plugin "layers" are active.
+    /// The digest is derived from the metadata by the caller (`meta.digest()`),
+    /// keeping the context agnostic about how digests are computed.
+    ///
+    /// # Panics
+    /// Panics if the internal plugin-index lock is poisoned.
+    pub fn register_plugin(&self, meta: &PluginMetadata) {
+        let digest = meta.digest();
+        let mut index = self.plugin_index.write().unwrap();
+        tracing::debug!(plugin = %meta.name, digest = %digest, "registering plugin");
+        index.insert(digest, meta.clone());
+    }
+
+    /// Look up a plugin's content-addressed digest by name.
+    ///
+    /// Returns `None` if no plugin with that name has been registered.
+    #[must_use]
+    pub fn plugin_digest(&self, plugin_name: &str) -> Option<PluginDigest> {
+        let index = self.plugin_index.read().unwrap();
+        index
+            .values()
+            .find(|m| m.name == plugin_name)
+            .map(|m| m.digest())
     }
 
     /// Unregister a provider's implementation from a seam.
@@ -210,16 +254,55 @@ impl Ctx {
     /// # Panics
     /// Panics if any of the internal seams/config/profile locks is poisoned.
     pub fn dump(&self) -> serde_json::Value {
-        let (seam_list, config, profile_name) = {
+        let (seam_list, seam_providers, plugin_digests, config, profile_name) = {
             let seams = self.seams.read().unwrap();
+            let index = self.plugin_index.read().unwrap();
             let config = self.config.read().unwrap();
             let profile = self.profile.read().unwrap();
+
+            let seam_list: Vec<String> = seams
+                .list()
+                .iter()
+                .map(std::string::ToString::to_string)
+                .collect();
+
+            // Content-addressed seam providers: seam -> [(provider, digest)].
+            let providers_map: serde_json::Map<String, serde_json::Value> = seams
+                .list()
+                .iter()
+                .map(|seam| {
+                    let providers = seams
+                        .providers(seam)
+                        .iter()
+                        .map(|(name, digest)| {
+                            serde_json::json!({
+                                "provider": name,
+                                "digest": digest.to_hex(),
+                            })
+                        })
+                        .collect::<Vec<_>>();
+                    (seam.to_string(), serde_json::Value::Array(providers))
+                })
+                .collect();
+
+            // Content-addressed plugin ledger: digest -> { name, version }.
+            let digests_map: serde_json::Map<String, serde_json::Value> = index
+                .iter()
+                .map(|(digest, meta)| {
+                    (
+                        digest.to_hex(),
+                        serde_json::json!({
+                            "name": meta.name,
+                            "version": meta.version,
+                        }),
+                    )
+                })
+                .collect();
+
             (
-                seams
-                    .list()
-                    .iter()
-                    .map(std::string::ToString::to_string)
-                    .collect::<Vec<_>>(),
+                seam_list,
+                providers_map,
+                digests_map,
                 config.clone(),
                 profile.name.clone(),
             )
@@ -228,6 +311,8 @@ impl Ctx {
         serde_json::json!({
             "profile": profile_name,
             "seams": seam_list,
+            "seam_providers": seam_providers,
+            "plugin_digests": plugin_digests,
             "config": config,
         })
     }
@@ -279,7 +364,12 @@ mod tests {
             name: "openai".to_string(),
         }) as Arc<dyn Seam>;
 
-        ctx.register_seam(seam.clone(), "openai-plugin".to_string(), impl_arc);
+        ctx.register_seam(
+            seam.clone(),
+            "openai-plugin".to_string(),
+            PluginDigest::empty(),
+            impl_arc,
+        );
 
         assert!(ctx.has_seam(&seam));
         let got = ctx.get_seam(&seam).unwrap();
@@ -294,7 +384,12 @@ mod tests {
             name: "shell".to_string(),
         }) as Arc<dyn Seam>;
 
-        ctx.register_seam(seam.clone(), "shell-plugin".to_string(), impl_arc);
+        ctx.register_seam(
+            seam.clone(),
+            "shell-plugin".to_string(),
+            PluginDigest::empty(),
+            impl_arc,
+        );
         assert!(ctx.has_seam(&seam));
 
         ctx.unregister_seam(&seam, "shell-plugin");
@@ -336,6 +431,47 @@ mod tests {
     }
 
     #[test]
+    fn ctx_register_plugin_records_digest() {
+        let ctx = Ctx::new();
+        let meta = PluginMetadata::new("openai-llm", "1.0.0");
+        let digest = meta.digest();
+
+        ctx.register_plugin(&meta);
+
+        assert_eq!(ctx.plugin_digest("openai-llm"), Some(digest));
+        assert_eq!(ctx.plugin_digest("does-not-exist"), None);
+    }
+
+    #[test]
+    fn ctx_dump_includes_seam_providers_and_digests() {
+        let ctx = Ctx::new();
+        let meta = PluginMetadata::new("openai-llm", "1.0.0");
+        let digest = meta.digest();
+        let impl_arc = Arc::new(DummySeam {
+            name: "openai".to_string(),
+        }) as Arc<dyn Seam>;
+
+        ctx.register_plugin(&meta);
+        ctx.register_seam(
+            SeamId::llm(),
+            "openai-llm".to_string(),
+            digest,
+            impl_arc,
+        );
+
+        let dump = ctx.dump();
+        // seam_providers maps each seam id to its (provider, digest) pairs.
+        let providers = &dump["seam_providers"]["ctx.llm"];
+        assert_eq!(providers[0]["provider"], "openai-llm");
+        assert_eq!(providers[0]["digest"], digest.to_hex());
+
+        // plugin_digests maps each hex digest to the plugin's name + version.
+        let entry = &dump["plugin_digests"][digest.to_hex()];
+        assert_eq!(entry["name"], "openai-llm");
+        assert_eq!(entry["version"], "1.0.0");
+    }
+
+    #[test]
     fn ctx_get_seam_typed() {
         struct MarkerSeam {
             name: String,
@@ -352,7 +488,12 @@ mod tests {
             name: "marker".to_string(),
         }) as Arc<dyn Seam>;
 
-        ctx.register_seam(seam.clone(), "marker-plugin".to_string(), impl_arc);
+        ctx.register_seam(
+            seam.clone(),
+            "marker-plugin".to_string(),
+            PluginDigest::empty(),
+            impl_arc,
+        );
 
         let typed: Option<Arc<MarkerSeam>> = ctx.get_seam_typed(&seam);
         assert!(typed.is_some());

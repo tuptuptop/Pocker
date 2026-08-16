@@ -4,6 +4,7 @@
 //! their service implementations. Any part of Pocker is a seam:
 //! `ctx.llm`, `ctx.tools`, `ctx.skills`, `ctx.sandbox`, etc.
 
+use crate::plugin::PluginDigest;
 use std::collections::HashMap;
 use std::fmt;
 use std::sync::Arc;
@@ -104,6 +105,8 @@ pub trait Seam: Send + Sync + std::any::Any {
 /// A seam entry — a registered implementation.
 pub(crate) struct SeamEntry {
     pub provider_name: String,
+    /// Content-addressed identity of the owning plugin (Pocker's "layer").
+    pub digest: PluginDigest,
     pub implementation: Arc<dyn Seam>,
 }
 
@@ -120,12 +123,29 @@ impl SeamRegistry {
         }
     }
 
-    /// Register an implementation for a seam.
-    pub fn register(&mut self, seam: SeamId, provider_name: String, implementation: Arc<dyn Seam>) {
+    /// Register an implementation for a seam, attributed to a plugin digest.
+    pub fn register(
+        &mut self,
+        seam: SeamId,
+        provider_name: String,
+        digest: PluginDigest,
+        implementation: Arc<dyn Seam>,
+    ) {
         self.entries.entry(seam).or_default().push(SeamEntry {
             provider_name,
+            digest,
             implementation,
         });
+    }
+
+    /// List `(provider name, plugin digest)` for a seam — used for
+    /// content-addressed discovery and the config dump.
+    #[must_use]
+    pub fn providers(&self, seam: &SeamId) -> Vec<(String, PluginDigest)> {
+        self.entries
+            .get(seam)
+            .map(|es| es.iter().map(|e| (e.provider_name.clone(), e.digest)).collect())
+            .unwrap_or_default()
     }
 
     /// Unregister all implementations from a specific provider.
@@ -166,6 +186,7 @@ impl Default for SeamRegistry {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::plugin::PluginMetadata;
 
     struct DummySeam {
         name: String,
@@ -185,7 +206,7 @@ mod tests {
             name: "openai".to_string(),
         }) as Arc<dyn Seam>;
 
-        registry.register(seam_id.clone(), "openai-plugin".to_string(), impl_arc);
+        registry.register(seam_id.clone(), "openai-plugin".to_string(), PluginDigest::empty(), impl_arc);
 
         assert!(registry.has(&seam_id));
         let got = registry.get(&seam_id).unwrap();
@@ -200,6 +221,7 @@ mod tests {
         registry.register(
             seam_id.clone(),
             "plugin-a".to_string(),
+            PluginDigest::empty(),
             Arc::new(DummySeam {
                 name: "a".to_string(),
             }) as Arc<dyn Seam>,
@@ -207,6 +229,7 @@ mod tests {
         registry.register(
             seam_id.clone(),
             "plugin-b".to_string(),
+            PluginDigest::empty(),
             Arc::new(DummySeam {
                 name: "b".to_string(),
             }) as Arc<dyn Seam>,
@@ -217,6 +240,27 @@ mod tests {
         assert!(registry.has(&seam_id));
         let got = registry.get(&seam_id).unwrap();
         assert_eq!(got.name(), "b");
+    }
+
+    #[test]
+    fn seam_entry_records_digest() {
+        let mut registry = SeamRegistry::new();
+        let seam_id = SeamId::llm();
+        let digest = PluginMetadata::new("openai", "1.0.0").digest();
+
+        registry.register(
+            seam_id.clone(),
+            "openai-plugin".to_string(),
+            digest,
+            Arc::new(DummySeam {
+                name: "openai".to_string(),
+            }) as Arc<dyn Seam>,
+        );
+
+        let providers = registry.providers(&seam_id);
+        assert_eq!(providers.len(), 1);
+        assert_eq!(providers[0].0, "openai-plugin");
+        assert_eq!(providers[0].1, digest);
     }
 
     #[test]

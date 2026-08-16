@@ -154,16 +154,34 @@ Standard seams you can extend:
 
 ## Why "Pocker": Docker Meets Plugin
 
-The name says it all: **Pocker = Portable + Container.** Pocker applies Docker's core insight — *package any capability as an immutable, portable, composable unit* — to AI agents, and fuses it with the **plugin** concept from `deepseek-harness`.
+The name says it all: **Pocker = Portable + Container.** Pocker borrows Docker's core design idea — *package any capability as an immutable, portable, composable unit* — and adapts it to AI agents by fusing it with the **plugin** concept from `deepseek-harness`.
+
+**One decisive reframing:** in Pocker's model the minimal, content-addressable unit is the **plugin**, not the container. A container is a *runtime instance* — mutable, ephemeral, identified by a process/runtime handle. A plugin is *content*: a self-contained, versioned, immutable bundle whose **content hash is its identity**. You address, cache, and reproduce plugins by hash; you never address a container.
 
 | Docker (apps) | Pocker (agents) |
 |---|---|
-| Image / Container | Plugin (a versioned capability unit) |
+| Image / Container | **Plugin** (the minimal hashable unit) |
+| Layer digest (content address) | **Plugin digest** (content address) |
 | `docker-compose` stack | Profile (layered plugin composition) |
 | Container runtime | Engine + typed **seams** |
 | Docker Hub | Pocker Hub (plugin registry) |
 | `Containerfile` / lockfile | `--dump-config` plugin tree (reproducible) |
 | Isolate processes | Isolate capabilities (mount / unmount on seams) |
+
+### Why the plugin — not the container — is the minimal hash unit
+
+- **Indivisible by design.** A plugin is the smallest artifact you can build, sign, publish, and address on its own. It carries its own manifest, capabilities, and metadata; you cannot partially hash "half a plugin." A container is just a live instantiation of a plugin graph and mutates as it runs.
+- **Identity = content hash.** A plugin's digest is computed from its bytes — same bytes, same hash, same plugin, anywhere. A container's identity is a runtime handle that is meaningless once it stops.
+- **Cache key = plugin digest.** Builds and runs are cached by plugin hash. Two agents sharing a plugin reuse the exact same cached bits — no rebuild, no re-download. Container-layer caching is coarser and tied to image build order.
+- **Content addressing is the source of truth.** `ctx` resolves a plugin by its digest; the registry, the Hub, and the lockfile all agree on that digest. There is no separate mutable `latest` pointer that can silently drift.
+
+### How the plugin-as-atom model reshapes the mechanics
+
+- **Image build → plugin assembly.** "Building" an agent means assembling a directed graph of plugins. Each node is content-addressed, so builds are deterministic and incremental.
+- **Layer reuse → plugin cache reuse.** Because the unit is the plugin, reuse is granular: swap one skill plugin and only that digest changes; everything else stays cached and reproducible.
+- **Dependency management → locked plugin trees.** Dependencies are declared as a plugin graph and resolved to a locked set of digests (`--dump-config`). Same inputs → same resolved tree on every machine, exactly like a pinned image — except the atom is the plugin, not the container.
+
+> **Implemented today.** The plugin-as-atom model is live in the code: every `PluginMetadata` carries a deterministic `digest()` (SHA-256 over name, version, type, `provides`, `requires`, and an optional `code_hash`); each seam registry entry records the owning plugin's `PluginDigest`; `Ctx::register_plugin` records mounted plugins into a content-addressed ledger; and `pocker --dump-config` emits `seam_providers` (seam → `[(provider, digest)]`) and `plugin_digests` (digest → `{ name, version }`) — a reproducible lockfile proving exactly which plugin "layers" are active.
 
 **What the fusion buys you:**
 
@@ -173,7 +191,7 @@ The name says it all: **Pocker = Portable + Container.** Pocker applies Docker's
 - **A marketplace, not a monastery.** Pocker Hub mirrors Docker Hub: publish, version, rate, and pull plugins. Capabilities become shareable currency.
 - **Reproducible by construction.** A locked plugin tree (`--dump-config`) is the agent-world equivalent of a pinned image — same inputs, same behavior, anywhere.
 
-Pocker is, in one line, **the container runtime for AI agents**: Docker gave applications portability and an ecosystem; Pocker gives agent *capabilities* the same — now plugin-shaped, harness-powered, and yours to compose.
+Pocker is, in one line, **the container runtime for AI agents — with the plugin as its true atomic unit**: Docker gave applications portability and an ecosystem; Pocker gives agent *capabilities* the same — now plugin-shaped, harness-powered, hash-addressed, and yours to compose.
 
 ---
 
@@ -296,6 +314,7 @@ impl Plugin for MyPlugin {
         ctx.register_seam(
             SeamId::llm(),
             "my-model".into(),
+            self.meta.digest(),
             Arc::new(LlmSeam { adapter: Arc::new(MyAdapter) }),
         );
         Ok(())

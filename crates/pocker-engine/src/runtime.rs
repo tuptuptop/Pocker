@@ -47,7 +47,7 @@ impl Engine {
                 ProfileManager::default()
             }
         };
-        let mut engine = Self {
+        let engine = Self {
             ctx: Arc::new(Ctx::new()),
             loader: PluginLoader::new(),
             profiles,
@@ -504,6 +504,7 @@ mod tests {
             ctx.register_seam(
                 pocker_core::seam::SeamId::new("ctx.foo"),
                 self.meta.name.clone(),
+                self.meta.digest(),
                 Arc::new(NoopSeam {
                     name: "foo".to_string(),
                 }) as Arc<dyn pocker_core::seam::Seam>,

@@ -19,7 +19,24 @@ license = "MIT"
 authors = ["Pocker Contributors"]
 repository = "https://github.com/pocker/pocker"
 homepage = "https://github.com/pocker/pocker"
-description = "Pocker — Plugin as a Service. Everything is a Plugin."
+description = "Pocker — the Rust-native, plugin-first AI agent runtime. Everything is a Plugin: LLM adapters, tools, skills, sandbox, and UI are swappable plugins on typed seams."
+keywords = [
+    "ai-agent",
+    "agent-framework",
+    "plugin-architecture",
+    "llm",
+    "mcp",
+    "tool-calling",
+    "agent-skills",
+    "self-hosted",
+    "cli",
+    "rust",
+]
+categories = [
+    "command-line-utilities",
+    "development-tools",
+    "ai",
+]
 
 [workspace.dependencies]
 # Async runtime
@@ -92,6 +109,12 @@ pocker-sandbox = { path = "crates/pocker-sandbox" }
 pocker-sdk = { path = "crates/pocker-sdk" }
 pocker-studio = { path = "crates/pocker-studio" }
 pocker-hub = { path = "crates/pocker-hub" }
+
+# Reference / integration dependencies — upstream deepseek-harness family.
+# These crates are not yet published to crates.io. Once a source is available,
+# uncomment and point at a git/path to wire the deepseek-harness plugin:
+# deepseek-harness = { git = "https://github.com/deepseek-ai/deepseek-harness" }
+# deepseek-harness-desktop = { git = "https://github.com/deepseek-ai/deepseek-harness-desktop" }
 
 [profile.release]
 opt-level = 3

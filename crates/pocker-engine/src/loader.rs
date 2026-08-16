@@ -77,6 +77,10 @@ impl PluginLoader {
 
         plugin.mount(ctx).await?;
 
+        // Record the plugin's content-addressed identity in the context ledger
+        // (Pocker's "layer" lockfile) so `ctx.dump()` can prove what is mounted.
+        ctx.register_plugin(plugin.metadata());
+
         {
             let plugins = self
                 .plugins
@@ -347,6 +351,7 @@ mod tests {
         ctx.register_seam(
             SeamId::llm(),
             "provider".to_string(),
+            pocker_core::plugin::PluginDigest::empty(),
             Arc::new(DummySeam {
                 name: "x".to_string(),
             }) as Arc<dyn pocker_core::seam::Seam>,

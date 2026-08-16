@@ -18,8 +18,8 @@ use std::sync::Arc;
 #[command(
     name = "pocker",
     version,
-    about = "Pocker — Plugin as a Service. Everything is a Plugin.",
-    long_about = "Pocker is a cross-platform plugin runtime where everything (LLM, tools, skills, sandbox, UI) is a plugin."
+    about = "Pocker — the Rust-native, plugin-first AI agent runtime.",
+    long_about = "Pocker is a cross-platform, self-hosted AI agent runtime where everything (LLM, tools, skills, sandbox, UI) is a swappable plugin mounted on typed capability seams."
 )]
 struct Cli {
     /// Profile to use

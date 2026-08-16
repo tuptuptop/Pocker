@@ -69,21 +69,25 @@ impl Plugin for AllInOnePlugin {
         ctx.register_seam(
             SeamId::tools(),
             self.meta.name.clone(),
+            self.meta.digest(),
             self.tool_seam.clone() as Arc<dyn pocker_core::seam::Seam>,
         );
         ctx.register_seam(
             SeamId::skills(),
             self.meta.name.clone(),
+            self.meta.digest(),
             self.skill_seam.clone() as Arc<dyn pocker_core::seam::Seam>,
         );
         ctx.register_seam(
             SeamId::llm(),
             self.meta.name.clone(),
+            self.meta.digest(),
             self.llm_seam.clone() as Arc<dyn pocker_core::seam::Seam>,
         );
         ctx.register_seam(
             SeamId::prompt(),
             self.meta.name.clone(),
+            self.meta.digest(),
             self.prompt_seam.clone() as Arc<dyn pocker_core::seam::Seam>,
         );
         Ok(())
