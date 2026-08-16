@@ -9,14 +9,8 @@
   "categories": ["productivity", "utilities"],
   "icons": [
     {
-      "src": "/hermes-icon-192.png",
-      "sizes": "192x192",
-      "type": "image/png",
-      "purpose": "any maskable"
-    },
-    {
-      "src": "/hermes-icon-512.png",
-      "sizes": "512x512",
+      "src": "/pocker-logo.png",
+      "sizes": "any",
       "type": "image/png",
       "purpose": "any maskable"
     }
