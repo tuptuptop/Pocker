@@ -143,6 +143,15 @@ jobs:
             artifact_name: PockerStudio-Setup-macos
             asset_pattern: '*.dmg'
     runs-on: ${{ matrix.os }}
+    env:
+      # node-gyp (used by @electron/rebuild to build node-pty from source)
+      # needs Python with distutils (present in 3.11, dropped in 3.12+) and a
+      # C++ toolchain. Pin both so it does not fall back to the runner's 3.12
+      # Python (no distutils) or an undetected VS install.
+      npm_config_python: python
+      PYTHON: python
+      npm_config_msvs_version: '2022'
+      GYP_MSVS_VERSION: '2022'
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -156,6 +165,17 @@ jobs:
         uses: pnpm/action-setup@v4
         with:
           version: 9.15.0
+
+      - name: Setup Python 3.11 (node-gyp needs distutils)
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Setup MSVC toolchain (Windows native build)
+        if: matrix.os == 'windows-latest'
+        uses: ilammy/msvc-dev-cmd@v1
+        with:
+          arch: x64
 
       - name: Download engine artifact (Windows)
         if: matrix.os == 'windows-latest'
